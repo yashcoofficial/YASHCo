@@ -71,40 +71,48 @@
   .divider-gold { height:1px; background: linear-gradient(90deg, transparent, hsl(var(--accent)) 50%, transparent); }
 
   .hero-home-banner {
-    min-height: 78vh;
-    height: 78vh;
+    min-height: var(--hero-height, 100vh);
+    height: var(--hero-height, 100vh);
   }
 
   @media (max-width: 767px) {
     .hero-home-banner {
       min-height: 78vh !important;
       height: 78vh !important;
+      margin-top: -5rem !important;
     }
 
     .hero-home-copy {
       max-width: 100%;
       width: 100%;
+      padding-left: 1rem !important;
+      padding-right: 1rem !important;
+      padding-bottom: max(1.25rem, env(safe-area-inset-bottom)) !important;
     }
 
     .hero-title,
     .hero-subtitle,
     .hero-cta {
       max-width: 100%;
+      overflow-wrap: anywhere;
     }
 
     .hero-title {
+      width: 100%;
+      line-height: 0.96;
+      text-wrap: balance;
+    }
+
+    .hero-subtitle {
       width: 100%;
     }
 
     .hero-cta {
       align-self: center;
-    }
-  }
-
-  @media (min-width: 768px) {
-    .hero-home-banner {
-      min-height: 100vh;
-      height: 100vh;
+      white-space: normal !important;
+      height: auto !important;
+      min-height: 3rem;
+      padding-inline: 1.25rem !important;
     }
   }
 }

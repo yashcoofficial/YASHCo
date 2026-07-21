@@ -430,8 +430,8 @@ function HomeView() {
   const renderSection = (id) => {
     switch (id) {
       case 'hero': return (
-        <section key="hero" className="hero-home-banner relative -mt-20 overflow-hidden" style={{ height: heroH }}>
-          <picture className="absolute inset-0">
+        <section key="hero" className="hero-home-banner relative -mt-20 overflow-hidden" style={{ '--hero-height': heroH }}>
+          <picture className="absolute inset-0 block h-full w-full">
             <source media="(max-width: 767px)" srcSet={heroImageMobile} />
             <source media="(min-width: 768px)" srcSet={heroImageDesktop} />
             <img src={heroImageDesktop} alt="" className="absolute inset-0 h-full w-full object-cover" style={{ objectPosition: heroObjectPosition }} />
