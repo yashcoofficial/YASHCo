@@ -400,11 +400,14 @@ function HomeView() {
   useEffect(() => { api('/products?featured=true').then(r => setFeatured(r.products.slice(0, 4))).catch(() => { }) }, [api])
 
   // Style helpers
-  const heroH = settings.heroHeight || '92vh'
+  const heroH = settings.heroHeight || '100vh'
   const heroAlign = settings.heroTextAlign || 'center'
   const heroVPos = settings.heroTextPosition || 'bottom'
   const heroOverlay = parseFloat(settings.heroOverlay ?? 0.4)
   const heroSize = settings.heroTitleSize || 'xl'
+  const heroImageDesktop = settings.heroImageDesktop || settings.heroImage
+  const heroImageMobile = settings.heroImageMobile || settings.heroImage
+  const heroObjectPosition = settings.heroObjectPosition || 'center center'
   const collCols = settings.collectionsColumns || '3'
   const featCols = settings.featuredColumns || '4'
   const featBg = settings.featuredBg || 'muted'
@@ -427,26 +430,30 @@ function HomeView() {
   const renderSection = (id) => {
     switch (id) {
       case 'hero': return (
-        <section key="hero" className="relative -mt-20 overflow-hidden" style={{ height: heroH }}>
-          <img src={settings.heroImage} alt="" className="absolute inset-0 w-full h-full object-cover" />
+        <section key="hero" className="hero-home-banner relative -mt-20 overflow-hidden" style={{ height: heroH }}>
+          <picture className="absolute inset-0">
+            <source media="(max-width: 767px)" srcSet={heroImageMobile} />
+            <source media="(min-width: 768px)" srcSet={heroImageDesktop} />
+            <img src={heroImageDesktop} alt="" className="absolute inset-0 h-full w-full object-cover" style={{ objectPosition: heroObjectPosition }} />
+          </picture>
           <div className="absolute inset-0" style={{ background: `linear-gradient(to bottom, rgba(0,0,0,${heroOverlay * 0.8}), rgba(0,0,0,${heroOverlay * 0.3}), rgba(0,0,0,${heroOverlay * 1.2}))` }} />
-          <div className={cx('relative z-10 h-full flex flex-col px-6 slow-fade',
+          <div className={cx('hero-home-copy relative z-10 h-full flex max-w-full flex-col px-4 sm:px-6 slow-fade',
             heroAlign === 'center' && 'items-center text-center',
             heroAlign === 'left' && 'items-start text-left max-w-[1400px] mx-auto',
             heroAlign === 'right' && 'items-end text-right max-w-[1400px] mx-auto',
-            heroVPos === 'bottom' && 'justify-end pb-24',
+            heroVPos === 'bottom' && 'justify-end pb-12 sm:pb-24',
             heroVPos === 'center' && 'justify-center',
-            heroVPos === 'top' && 'justify-start pt-32',
+            heroVPos === 'top' && 'justify-start pt-20 sm:pt-32',
           )}>
-            <div className="text-white/80 text-[11px] tracking-luxe uppercase mb-6">{settings.heroEyebrow || 'Season 01 — Nocturne'}</div>
-            <h1 className={cx('font-serif text-white leading-[0.95] font-light',
-              heroSize === 'xl' && 'text-6xl md:text-8xl lg:text-9xl',
-              heroSize === 'lg' && 'text-5xl md:text-7xl lg:text-8xl',
-              heroSize === 'md' && 'text-4xl md:text-6xl lg:text-7xl',
-              heroSize === 'sm' && 'text-3xl md:text-5xl lg:text-6xl',
+            <div className="text-white/80 text-[11px] tracking-luxe uppercase mb-4 sm:mb-6">{settings.heroEyebrow || 'Season 01 — Nocturne'}</div>
+            <h1 className={cx('hero-title font-serif text-white leading-[0.95] font-light max-w-full break-words',
+              heroSize === 'xl' && 'text-4xl sm:text-6xl md:text-8xl lg:text-9xl',
+              heroSize === 'lg' && 'text-4xl sm:text-5xl md:text-7xl lg:text-8xl',
+              heroSize === 'md' && 'text-3xl sm:text-4xl md:text-6xl lg:text-7xl',
+              heroSize === 'sm' && 'text-3xl sm:text-4xl md:text-5xl lg:text-6xl',
             )}>{settings.heroTitle}</h1>
-            <p className="text-white/85 mt-6 max-w-xl text-sm md:text-base">{settings.heroSubtitle}</p>
-            <Button onClick={() => navigate('shop')} className="mt-10 rounded-none bg-white text-black hover:bg-white/90 h-12 px-10 tracking-editorial uppercase text-xs">{settings.heroCtaLabel || 'Discover the Collection'}</Button>
+            <p className="hero-subtitle text-white/85 mt-4 sm:mt-6 max-w-[min(100%,36rem)] text-sm md:text-base leading-relaxed">{settings.heroSubtitle}</p>
+            <Button onClick={() => navigate('shop')} className="hero-cta mt-8 sm:mt-10 rounded-none bg-white text-black hover:bg-white/90 h-12 px-6 sm:px-10 tracking-editorial uppercase text-xs max-w-full whitespace-nowrap">{settings.heroCtaLabel || 'Discover the Collection'}</Button>
           </div>
         </section>
       )
@@ -1502,21 +1509,25 @@ function AdminProducts() {
         <Button className="rounded-none tracking-editorial uppercase text-xs" onClick={() => setEditing({ ...empty })}><Plus className="w-3.5 h-3.5 mr-2" />New Product</Button>
       </div>
       <div className="grid gap-2">
-        {products.map(p => (
-          <div key={p.id} className="grid grid-cols-[60px_1fr_auto_auto_auto] gap-4 items-center border border-border p-3">
-            <img src={p.images?.[0]} className="w-14 h-16 object-cover" />
-            <div>
-              <div className="font-serif text-lg">{p.name}</div>
-              <div className="text-xs text-muted-foreground">{p.collection} · SKU {p.sku}</div>
+        {products.map(p => {
+          const stock = Number(p.stock) || 0
+          const lowStockThreshold = Number(p.lowStockThreshold) || 3
+          return (
+            <div key={p.id} className="grid grid-cols-[60px_1fr_auto_auto_auto] gap-4 items-center border border-border p-3">
+              <img src={p.images?.[0]} className="w-14 h-16 object-cover" />
+              <div>
+                <div className="font-serif text-lg">{p.name}</div>
+                <div className="text-xs text-muted-foreground">{p.collection} · SKU {p.sku}</div>
+              </div>
+              <div className="text-sm">{money(p.price)}</div>
+              <Badge className={cx('rounded-none', stock <= lowStockThreshold ? 'bg-destructive text-destructive-foreground' : 'bg-muted text-foreground')}>Stock {stock}</Badge>
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" className="rounded-none" onClick={() => setEditing({ ...p, images: p.images?.length ? p.images : [''] })}><Edit3 className="w-3.5 h-3.5" /></Button>
+                <Button size="sm" variant="outline" className="rounded-none" onClick={() => remove(p.id)}><Trash2 className="w-3.5 h-3.5" /></Button>
+              </div>
             </div>
-            <div className="text-sm">₹{p.price.toLocaleString('en-IN')}</div>
-            <Badge className={cx('rounded-none', p.stock <= p.lowStockThreshold ? 'bg-destructive text-destructive-foreground' : 'bg-muted text-foreground')}>Stock {p.stock}</Badge>
-            <div className="flex gap-2">
-              <Button size="sm" variant="outline" className="rounded-none" onClick={() => setEditing({ ...p, images: p.images?.length ? p.images : [''] })}><Edit3 className="w-3.5 h-3.5" /></Button>
-              <Button size="sm" variant="outline" className="rounded-none" onClick={() => remove(p.id)}><Trash2 className="w-3.5 h-3.5" /></Button>
-            </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
       <Dialog open={!!editing} onOpenChange={o => !o && setEditing(null)}>
         <DialogContent className="rounded-none max-w-2xl max-h-[85vh] overflow-y-auto">
@@ -1850,7 +1861,9 @@ const HOME_SECTION_DEFS = [
   {
     id: 'hero', label: 'Hero Banner', accent: '#1a1a2e',
     fields: [
-      { key: 'heroImage', label: 'Background Image URL', type: 'url', placeholder: 'https://...' },
+      { key: 'heroImage', label: 'Desktop Background Image URL', type: 'url', placeholder: 'https://...' },
+      { key: 'heroImageMobile', label: 'Mobile Background Image URL', type: 'url', placeholder: 'https://...' },
+      { key: 'heroObjectPosition', label: 'Image Focus Position', type: 'text', placeholder: 'center center' },
       { key: 'heroEyebrow', label: 'Season Label / Eyebrow', type: 'text', placeholder: 'Season 01 — Nocturne' },
       { key: 'heroTitle', label: 'Main Title', type: 'text', placeholder: 'Own Every Moment' },
       { key: 'heroSubtitle', label: 'Subtitle', type: 'textarea', placeholder: 'A curated house of quiet luxury…' },
@@ -1879,7 +1892,7 @@ const HOME_SECTION_DEFS = [
     ],
     preview: (s) => (
       <div style={{ position: 'relative', height: '160px', overflow: 'hidden', background: '#111' }}>
-        {s.heroImage && <img src={s.heroImage} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0.55 }} />}
+        {(s.heroImageMobile || s.heroImage) && <img src={s.heroImageMobile || s.heroImage} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: s.heroObjectPosition || 'center center', opacity: 0.55 }} />}
         <div style={{ position: 'absolute', inset: 0, background: `rgba(0,0,0,${s.heroOverlay || 0.4})` }} />
         <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '16px', textAlign: s.heroTextAlign || 'center', color: 'white' }}>
           <div style={{ fontSize: '8px', letterSpacing: '0.3em', textTransform: 'uppercase', opacity: 0.7, marginBottom: '4px' }}>{s.heroEyebrow || 'Season 01 — Nocturne'}</div>
