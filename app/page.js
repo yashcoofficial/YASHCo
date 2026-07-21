@@ -19,6 +19,7 @@ import {
   Truck, Star, Filter, Check, ArrowRight, Instagram, Facebook, Twitter,
   GripVertical, Eye, EyeOff,
 } from 'lucide-react'
+import { buildRouteForView, getBoutiqueNavItems, getVisibleNavItems, resolveViewFromPath } from '@/lib/navigation'
 
 // ---------- Context ----------
 const AppCtx = createContext(null)
@@ -27,6 +28,27 @@ const useApp = () => useContext(AppCtx)
 // ---------- Helpers ----------
 const money = (n, sym = '₹') => `${sym}${(n || 0).toLocaleString('en-IN')}`
 const cx = (...a) => a.filter(Boolean).join(' ')
+
+const DEFAULT_SOCIAL_LINKS = [
+  { label: 'Instagram', url: 'https://www.instagram.com/', visible: true },
+]
+
+function normalizeSocialLinks(items) {
+  const safeItems = Array.isArray(items) ? items : []
+  return safeItems.length ? safeItems.map(link => ({
+    label: link?.label || 'Social',
+    url: link?.url || '',
+    visible: link?.visible !== false,
+  })) : DEFAULT_SOCIAL_LINKS
+}
+
+function socialIconFor(label = '') {
+  const name = String(label).toLowerCase()
+  if (name.includes('instagram')) return Instagram
+  if (name.includes('facebook') || name.includes('meta')) return Facebook
+  if (name.includes('twitter') || name.includes('x')) return Twitter
+  return MessageCircle
+}
 
 // Map friendly colour names to CSS colours for swatch previews
 function colorHex(name) {
@@ -47,7 +69,12 @@ function colorHex(name) {
 
 // ---------- Root ----------
 export default function App() {
-  const [view, setView] = useState({ name: 'home', params: {} })
+  const getInitialView = () => {
+    if (typeof window === 'undefined') return { name: 'home', params: {} }
+    return resolveViewFromPath(window.location.pathname, new URLSearchParams(window.location.search))
+  }
+
+  const [view, setView] = useState(getInitialView)
   const [user, setUser] = useState(null)
   const [token, setToken] = useState(null)
   const [settings, setSettings] = useState(null)
@@ -68,9 +95,24 @@ export default function App() {
     return data
   }, [token])
 
+  const updateUrlForView = useCallback((nextView, method = 'push') => {
+    if (typeof window === 'undefined') return
+    const target = buildRouteForView(nextView.name, nextView.params)
+    const current = `${window.location.pathname}${window.location.search}`
+    if (current !== target) {
+      window.history[method === 'replace' ? 'replaceState' : 'pushState'](null, '', target)
+    }
+  }, [])
+
   const navigate = (name, params = {}) => {
-    setView({ name, params }); setMenuOpen(false); setCartOpen(false)
-    if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' })
+    const nextView = { name, params }
+    setView(nextView)
+    setMenuOpen(false)
+    setCartOpen(false)
+    if (typeof window !== 'undefined') {
+      updateUrlForView(nextView, 'push')
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
   }
 
   // Load initial
@@ -131,8 +173,24 @@ export default function App() {
     img.src = settings.logoUrl
   }, [settings?.logoUrl])
 
-  // Hidden admin portal: navigate to admin login when URL hash is #atelier
   useEffect(() => {
+    if (typeof window === 'undefined') return
+    const target = buildRouteForView(view.name, view.params)
+    const current = `${window.location.pathname}${window.location.search}`
+    if (current !== target) {
+      window.history.replaceState(null, '', target)
+    }
+  }, [view.name, view.params])
+
+  useEffect(() => {
+    const handlePopState = () => {
+      if (typeof window === 'undefined') return
+      const nextView = resolveViewFromPath(window.location.pathname, new URLSearchParams(window.location.search))
+      setView(nextView)
+      setMenuOpen(false)
+      setCartOpen(false)
+    }
+
     const check = () => {
       if (typeof window === 'undefined') return
       const h = window.location.hash
@@ -140,9 +198,14 @@ export default function App() {
         setView({ name: 'adminLogin', params: {} })
       }
     }
+
     check()
     window.addEventListener('hashchange', check)
-    return () => window.removeEventListener('hashchange', check)
+    window.addEventListener('popstate', handlePopState)
+    return () => {
+      window.removeEventListener('hashchange', check)
+      window.removeEventListener('popstate', handlePopState)
+    }
   }, [])
 
   const setAuth = (tok, u) => {
@@ -221,7 +284,7 @@ function AnnouncementBar() {
 }
 
 function Header() {
-  const { navigate, user, cart, settings, setCartOpen, setMenuOpen, view, transparentLogo } = useApp()
+  const { navigate, user, cart, settings, setCartOpen, setMenuOpen, view, transparentLogo, collections } = useApp()
   const [scrolled, setScrolled] = useState(false)
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20)
@@ -230,17 +293,16 @@ function Header() {
   const cartCount = cart.reduce((s, x) => s + x.qty, 0)
   const transparent = view.name === 'home' && !scrolled
   const logoSrc = transparentLogo || settings.logoUrl
+  const navLinks = getVisibleNavItems(settings?.headerNavLinks, collections)
   return (
     <header className={cx('sticky top-0 z-40 transition-all', transparent ? 'bg-transparent' : 'bg-background/90 backdrop-blur-md border-b border-border')}>
       <div className="max-w-[1400px] mx-auto px-4 md:px-8 h-20 flex items-center justify-between">
         <div className="flex items-center gap-6 flex-1">
           <button className="md:hidden" onClick={() => setMenuOpen(true)}><Menu className={cx('w-5 h-5', transparent && 'text-white')} /></button>
           <nav className={cx('hidden md:flex items-center gap-8 text-[11px] tracking-editorial uppercase', transparent && 'text-white')}>
-            <button onClick={() => navigate('shop')} className="hover:text-accent transition-colors">Shop</button>
-            <button onClick={() => navigate('shop', { collection: 'womenswear' })} className="hover:text-accent transition-colors">Women</button>
-            <button onClick={() => navigate('shop', { collection: 'menswear' })} className="hover:text-accent transition-colors">Men</button>
-            <button onClick={() => navigate('shop', { collection: 'accessories' })} className="hover:text-accent transition-colors">Accessories</button>
-            <button onClick={() => navigate('concierge')} className="hover:text-accent transition-colors">Concierge</button>
+            {navLinks.map(link => (
+              <button key={`${link.page}-${link.collection || 'main'}`} onClick={() => navigate(link.page, link.collection ? { collection: link.collection } : {})} className="hover:text-accent transition-colors">{link.label}</button>
+            ))}
           </nav>
         </div>
         <button onClick={() => navigate('home')} className="flex items-center justify-center">
@@ -263,16 +325,16 @@ function Header() {
 }
 
 function MobileMenu() {
-  const { menuOpen, setMenuOpen, navigate, user } = useApp()
+  const { menuOpen, setMenuOpen, navigate, user, settings, collections } = useApp()
+  const navLinks = getVisibleNavItems(settings?.headerNavLinks, collections)
   return (
     <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
       <SheetContent side="left" className="w-[85vw] sm:w-[380px] bg-background">
         <SheetHeader><SheetTitle className="font-serif text-2xl">Menu</SheetTitle></SheetHeader>
         <div className="mt-8 flex flex-col gap-5 text-sm tracking-editorial uppercase">
-          {['shop', 'womenswear', 'menswear', 'accessories'].map((c, i) => (
-            <button key={c} onClick={() => navigate('shop', c === 'shop' ? {} : { collection: c })} className="text-left border-b border-border pb-3">{c === 'shop' ? 'All' : c}</button>
+          {navLinks.map(link => (
+            <button key={`${link.page}-${link.collection || 'main'}`} onClick={() => navigate(link.page, link.collection ? { collection: link.collection } : {})} className="text-left border-b border-border pb-3">{link.label}</button>
           ))}
-          <button onClick={() => navigate('concierge')} className="text-left border-b border-border pb-3">Concierge</button>
           <button onClick={() => navigate(user ? (user.role === 'admin' ? 'admin' : 'dashboard') : 'login')} className="text-left border-b border-border pb-3">{user ? 'Account' : 'Sign In'}</button>
         </div>
       </SheetContent>
@@ -354,6 +416,13 @@ function HomeView() {
 
   const sectionOrder = settings.homeSectionOrder || DEFAULT_HOME_ORDER
   const vis = settings.homeSectionVisibility || {}
+  const visibleCollectionLinks = getBoutiqueNavItems(settings?.headerNavLinks, collections).filter((item) => item.collectionSlug)
+  const collectionItems = visibleCollectionLinks
+    .map((link) => {
+      const collection = collections.find((c) => c.slug === link.collectionSlug)
+      return collection ? { ...collection, navLabel: link.label, navFooterLabel: link.footerLabel } : null
+    })
+    .filter(Boolean)
 
   const renderSection = (id) => {
     switch (id) {
@@ -383,6 +452,7 @@ function HomeView() {
       )
       case 'collections':
         const collOverrides = (settings.collectionsImages || '').split('\n').map(x => x.trim()).filter(Boolean)
+        if (!collectionItems.length) return null
         return (
           <section key="collections" className="max-w-[1400px] mx-auto px-4 md:px-8 py-24 md:py-32">
             <div className="text-center mb-16">
@@ -392,7 +462,7 @@ function HomeView() {
             <div className={cx('grid gap-6 md:gap-10',
               collCols === '2' && 'md:grid-cols-2', collCols === '3' && 'md:grid-cols-3', collCols === '4' && 'md:grid-cols-4',
             )}>
-              {collections.map((c, i) => (
+              {collectionItems.map((c, i) => (
                 <button key={c.id} onClick={() => navigate('shop', { collection: c.slug })} className="group text-left">
                   <div className="img-zoom overflow-hidden bg-muted" style={{ aspectRatio: settings.collectionsAspect || '3/4' }}><img src={collOverrides[i] || c.image} alt={c.name} className="w-full h-full object-cover" /></div>
                   <div className="mt-5 flex items-baseline justify-between">
@@ -633,10 +703,14 @@ function PromoBannerSection({ section }) {
 
 // ---------- Shop ----------
 function ShopView() {
-  const { api, view, collections, allProducts, settings } = useApp()
+  const { api, view, collections, allProducts, settings, navigate } = useApp()
   const [products, setProducts] = useState([])
   const [filters, setFilters] = useState({ collection: view.params.collection || '', size: '', color: '', minPrice: '', maxPrice: '', search: '', sort: '' })
   const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    setFilters(prev => ({ ...prev, collection: view.params.collection || '' }))
+  }, [view.params.collection])
 
   useEffect(() => {
     setLoading(true)
@@ -648,7 +722,7 @@ function ShopView() {
   const allSizes = [...new Set(allProducts.flatMap(p => p.sizes || []))]
   const collectionColors = [...new Set(allProducts.filter(p => !filters.collection || p.collection === filters.collection).flatMap(p => p.colors || []))]
 
-  const pageKey = view.params.collection || 'shop'
+  const pageKey = 'shop'
   let pageSections = settings.pageLayouts?.[pageKey]?.sections || []
   if (!pageSections.find(s => s.type === 'core-shop')) {
     pageSections = [...pageSections, { id: `core-${pageKey}`, type: 'core-shop', visible: true, order: 999 }]
@@ -675,8 +749,8 @@ function ShopView() {
                   <div>
                     <Label className="text-[11px] tracking-editorial uppercase text-muted-foreground">Collection</Label>
                     <div className="mt-3 space-y-2">
-                      <button onClick={() => setFilters(f => ({ ...f, collection: '' }))} className={cx('block text-sm', !filters.collection && 'text-accent')}>All</button>
-                      {collections.map(c => <button key={c.id} onClick={() => setFilters(f => ({ ...f, collection: c.slug }))} className={cx('block text-sm', filters.collection === c.slug && 'text-accent')}>{c.name}</button>)}
+                      <button onClick={() => navigate('shop')} className={cx('block text-sm', !filters.collection && 'text-accent')}>All</button>
+                      {collections.map(c => <button key={c.id} onClick={() => navigate('shop', { collection: c.slug })} className={cx('block text-sm', filters.collection === c.slug && 'text-accent')}>{c.name}</button>)}
                     </div>
                   </div>
                   <div>
@@ -773,11 +847,16 @@ function ProductView() {
           <div className="mt-8">
             <div className="flex items-center justify-between mb-3">
               <Label className="text-[11px] tracking-editorial uppercase text-muted-foreground">Size</Label>
-              <button className="text-[11px] tracking-editorial uppercase underline">Size Guide</button>
+              <span className="text-[11px] tracking-editorial uppercase text-muted-foreground">Size Guide</span>
             </div>
             <div className="flex flex-wrap gap-2">
               {product.sizes?.map(s => <button key={s} onClick={() => setSize(s)} className={cx('px-4 py-2 border text-xs', size === s ? 'border-primary bg-primary text-primary-foreground' : 'border-border')}>{s}</button>)}
             </div>
+          </div>
+
+          <div className="mt-6 rounded-none border border-border p-4">
+            <div className="text-[11px] tracking-editorial uppercase text-muted-foreground mb-3">Size Guide</div>
+            <p className="text-sm whitespace-pre-wrap">{product.sizeGuide || 'Please contact our concierge for bespoke fit guidance and sizing support.'}</p>
           </div>
           <div className="mt-6">
             <Label className="text-[11px] tracking-editorial uppercase text-muted-foreground">Colour: {color}</Label>
@@ -1406,7 +1485,7 @@ function AdminProducts() {
   const [editing, setEditing] = useState(null)
   const reload = () => api('/products').then(r => setProducts(r.products))
   useEffect(() => { reload() }, [])
-  const empty = { name: '', description: '', collection: 'womenswear', price: 0, salePrice: '', onSale: false, sku: '', stock: 0, images: [''], sizes: ['XS', 'S', 'M', 'L', 'XL'], colors: ['Noir', 'Ivory', 'Champagne'], material: '', care: '', featured: false, lowStockThreshold: 3 }
+  const empty = { name: '', description: '', collection: 'womenswear', price: 0, salePrice: '', onSale: false, sku: '', stock: 0, images: [''], sizes: ['XS', 'S', 'M', 'L', 'XL'], colors: ['Noir', 'Ivory', 'Champagne'], material: '', care: '', sizeGuide: '', featured: false, lowStockThreshold: 3 }
   const save = async () => {
     try {
       const body = { ...editing, images: editing.images.filter(Boolean) }
@@ -1466,10 +1545,11 @@ function AdminProducts() {
               ))}
               <Button variant="outline" size="sm" className="rounded-none mt-2" onClick={() => setEditing({ ...editing, images: [...editing.images, ''] })}>+ Add Image</Button>
             </div>
-            <Input placeholder="Sizes (comma separated)" className="rounded-none" value={editing.sizes.join(',')} onChange={e => setEditing({ ...editing, sizes: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })} />
-            <Input placeholder="Colors (comma separated)" className="rounded-none" value={editing.colors.join(',')} onChange={e => setEditing({ ...editing, colors: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })} />
+            <Input placeholder="Sizes (comma separated)" className="rounded-none" value={Array.isArray(editing.sizes) ? editing.sizes.join(',') : ''} onChange={e => setEditing({ ...editing, sizes: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })} />
+            <Input placeholder="Colors (comma separated)" className="rounded-none" value={Array.isArray(editing.colors) ? editing.colors.join(',') : ''} onChange={e => setEditing({ ...editing, colors: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })} />
             <Textarea placeholder="Material & Craft" rows={2} className="rounded-none" value={editing.material} onChange={e => setEditing({ ...editing, material: e.target.value })} />
             <Textarea placeholder="Care instructions" rows={2} className="rounded-none" value={editing.care} onChange={e => setEditing({ ...editing, care: e.target.value })} />
+            <Textarea placeholder="Size guide for customers" rows={4} className="rounded-none" value={editing.sizeGuide || ''} onChange={e => setEditing({ ...editing, sizeGuide: e.target.value })} />
             <div className="flex gap-6">
               <label className="flex items-center gap-2 text-sm"><Switch checked={editing.featured} onCheckedChange={v => setEditing({ ...editing, featured: v })} /> Featured</label>
               <label className="flex items-center gap-2 text-sm"><Switch checked={editing.onSale} onCheckedChange={v => setEditing({ ...editing, onSale: v })} /> On Sale</label>
@@ -1640,6 +1720,12 @@ function AdminSettings() {
   }
   const setField = (k, v) => setForm(f => ({ ...f, [k]: v }))
   const setConcierge = (k, v) => setForm(f => ({ ...f, concierge: { ...(f.concierge || {}), [k]: v } }))
+  const setNavLink = (idx, key, val) => setForm(f => ({ ...f, headerNavLinks: (f.headerNavLinks || []).map((link, i) => i === idx ? { ...link, [key]: val } : link) }))
+  const addNavLink = () => setForm(f => ({ ...f, headerNavLinks: [...(f.headerNavLinks || []), { label: 'New Link', page: 'shop', visible: true }] }))
+  const removeNavLink = (idx) => setForm(f => ({ ...f, headerNavLinks: (f.headerNavLinks || []).filter((_, i) => i !== idx) }))
+  const setSocialLink = (idx, key, val) => setForm(f => ({ ...f, socialLinks: (f.socialLinks || []).map((link, i) => i === idx ? { ...link, [key]: val } : link) }))
+  const addSocialLink = () => setForm(f => ({ ...f, socialLinks: [...(f.socialLinks || []), { label: 'Social', url: '', visible: true }] }))
+  const removeSocialLink = (idx) => setForm(f => ({ ...f, socialLinks: (f.socialLinks || []).filter((_, i) => i !== idx) }))
   if (!form) return null
   return (
     <div className="max-w-3xl space-y-6">
@@ -1675,6 +1761,41 @@ function AdminSettings() {
         <Label>Subtitle</Label><Textarea className="rounded-none" value={form.concierge?.subtitle || ''} onChange={e => setConcierge('subtitle', e.target.value)} />
         <Label>Email</Label><Input className="rounded-none" value={form.concierge?.email || ''} onChange={e => setConcierge('email', e.target.value)} />
         <Label>Phone</Label><Input className="rounded-none" value={form.concierge?.phone || ''} onChange={e => setConcierge('phone', e.target.value)} />
+      </div>
+      <div className="space-y-3 border-t border-border pt-6">
+        <h4 className="font-serif text-xl">Header Navigation</h4>
+        <div className="text-xs text-muted-foreground">Choose the pages that appear in the header and mobile menu. Toggle any link off to hide it from customers.</div>
+        {(form.headerNavLinks || []).map((link, idx) => (
+          <div key={idx} className="border border-border p-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs">Link {idx + 1}</Label>
+              <label className="flex items-center gap-2 text-sm"><Switch checked={link.visible !== false} onCheckedChange={v => setNavLink(idx, 'visible', v)} /> Visible</label>
+            </div>
+            <Input className="rounded-none" value={link.label || ''} onChange={e => setNavLink(idx, 'label', e.target.value)} placeholder="Label" />
+            <div className="grid md:grid-cols-2 gap-2">
+              <Input className="rounded-none" value={link.page || ''} onChange={e => setNavLink(idx, 'page', e.target.value)} placeholder="Page key (shop, about, concierge, home)" />
+              <Input className="rounded-none" value={link.collection || ''} onChange={e => setNavLink(idx, 'collection', e.target.value)} placeholder="Collection slug (optional)" />
+            </div>
+            <div className="flex justify-end"><Button variant="outline" size="sm" className="rounded-none" onClick={() => removeNavLink(idx)}>Remove</Button></div>
+          </div>
+        ))}
+        <Button variant="outline" size="sm" className="rounded-none" onClick={addNavLink}>+ Add Header Link</Button>
+      </div>
+      <div className="space-y-3 border-t border-border pt-6">
+        <h4 className="font-serif text-xl">Social Links</h4>
+        <div className="text-xs text-muted-foreground">Add links that should appear in the footer for your social channels.</div>
+        {(form.socialLinks || []).map((link, idx) => (
+          <div key={idx} className="border border-border p-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs">Social {idx + 1}</Label>
+              <label className="flex items-center gap-2 text-sm"><Switch checked={link.visible !== false} onCheckedChange={v => setSocialLink(idx, 'visible', v)} /> Visible</label>
+            </div>
+            <Input className="rounded-none" value={link.label || ''} onChange={e => setSocialLink(idx, 'label', e.target.value)} placeholder="Instagram, Facebook, X" />
+            <Input className="rounded-none" value={link.url || ''} onChange={e => setSocialLink(idx, 'url', e.target.value)} placeholder="https://..." />
+            <div className="flex justify-end"><Button variant="outline" size="sm" className="rounded-none" onClick={() => removeSocialLink(idx)}>Remove</Button></div>
+          </div>
+        ))}
+        <Button variant="outline" size="sm" className="rounded-none" onClick={addSocialLink}>+ Add Social Link</Button>
       </div>
       <div className="space-y-3 border-t border-border pt-6">
         <h4 className="font-serif text-xl">Footer</h4>
@@ -2494,18 +2615,19 @@ function SectionEditor({ section, onChange }) {
 
 // ---------- Footer ----------
 function Footer() {
-  const { settings, navigate, transparentLogo } = useApp()
+  const { settings, navigate, transparentLogo, collections } = useApp()
   const logoSrc = transparentLogo || settings.logoUrl
+  const socialLinks = normalizeSocialLinks(settings?.socialLinks).filter(link => link.visible !== false)
+  const boutiqueLinks = getBoutiqueNavItems(settings?.headerNavLinks, collections)
   return (
     <footer className="bg-primary text-primary-foreground py-16 mt-20">
       <div className="max-w-[1400px] mx-auto px-4 md:px-8 grid md:grid-cols-3 gap-10">
         <div>
           <div className="text-[11px] tracking-editorial uppercase text-primary-foreground/60 mb-4">Boutique</div>
           <div className="space-y-2 text-sm">
-            <button className="block" onClick={() => navigate('shop')}>All Pieces</button>
-            <button className="block" onClick={() => navigate('shop', { collection: 'womenswear' })}>Womenswear</button>
-            <button className="block" onClick={() => navigate('shop', { collection: 'menswear' })}>Menswear</button>
-            <button className="block" onClick={() => navigate('shop', { collection: 'accessories' })}>Accessories</button>
+            {boutiqueLinks.map((link) => (
+              <button key={link.id} className="block" onClick={() => navigate(link.pageKey || link.page, link.collectionSlug ? { collection: link.collectionSlug } : {})}>{link.footerLabel || link.label}</button>
+            ))}
           </div>
         </div>
         <div>
@@ -2521,7 +2643,17 @@ function Footer() {
             <div>{settings.concierge?.email}</div>
             <div>{settings.concierge?.phone}</div>
           </div>
-          <div className="flex gap-4 mt-6"><Instagram className="w-4 h-4" /><Facebook className="w-4 h-4" /><Twitter className="w-4 h-4" /></div>
+          <div className="flex flex-wrap gap-3 mt-6">
+            {socialLinks.map((link, idx) => {
+              const Icon = socialIconFor(link.label)
+              return (
+                <a key={`${link.label}-${idx}`} href={link.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 text-[11px] tracking-editorial uppercase text-primary-foreground/80 hover:text-white transition-colors">
+                  <Icon className="w-4 h-4" />
+                  <span>{link.label}</span>
+                </a>
+              )
+            })}
+          </div>
         </div>
       </div>
       <div className="max-w-[1400px] mx-auto px-4 md:px-8 mt-14 pt-10 border-t border-primary-foreground/10 flex flex-col items-center gap-6">

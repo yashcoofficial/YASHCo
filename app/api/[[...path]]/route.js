@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { MongoClient } from 'mongodb'
 import crypto from 'crypto'
 import { v4 as uuidv4 } from 'uuid'
+import { DEFAULT_NAV_ITEMS } from '@/lib/navigation'
 
 // ---------- DB ----------
 let clientPromise
@@ -104,53 +105,74 @@ async function seedIfNeeded() {
       footerCopy: '© YASH Maison. Made with quiet devotion.',
       currency: 'INR',
       currencySymbol: '₹',
+      headerNavLinks: DEFAULT_NAV_ITEMS.map((item) => ({
+        label: item.label,
+        page: item.pageKey,
+        collection: item.collectionSlug || '',
+        visible: item.visible,
+      })),
+      socialLinks: [
+        { label: 'Instagram', url: 'https://www.instagram.com/', visible: true },
+      ],
       updatedAt: new Date(),
     })
   }
-  const cCount = await database.collection('collections').countDocuments()
-  if (cCount === 0) {
-    await database.collection('collections').insertMany([
-      { id: uuidv4(), name: 'Womenswear', slug: 'womenswear', image: 'https://images.pexels.com/photos/35596695/pexels-photo-35596695.jpeg', description: 'Softly tailored silhouettes for the modern woman.', order: 1 },
-      { id: uuidv4(), name: 'Menswear', slug: 'menswear', image: 'https://images.pexels.com/photos/28133643/pexels-photo-28133643.jpeg', description: 'Sharply cut suits, quiet knits, considered essentials.', order: 2 },
-      { id: uuidv4(), name: 'Accessories', slug: 'accessories', image: 'https://images.pexels.com/photos/28557819/pexels-photo-28557819.jpeg', description: 'Leather, silk, and metal — the finishing gestures.', order: 3 },
-    ])
+  const requiredCollections = [
+    { name: 'Womenswear', slug: 'womenswear', image: 'https://images.pexels.com/photos/35596695/pexels-photo-35596695.jpeg', description: 'Softly tailored silhouettes for the modern woman.', order: 1 },
+    { name: 'Menswear', slug: 'menswear', image: 'https://images.pexels.com/photos/28133643/pexels-photo-28133643.jpeg', description: 'Sharply cut suits, quiet knits, considered essentials.', order: 2 },
+    { name: 'Accessories', slug: 'accessories', image: 'https://images.pexels.com/photos/28557819/pexels-photo-28557819.jpeg', description: 'Leather, silk, and metal — the finishing gestures.', order: 3 },
+  ]
+
+  for (const collection of requiredCollections) {
+    const existing = await database.collection('collections').findOne({ slug: collection.slug })
+    if (!existing) {
+      await database.collection('collections').insertOne({
+        id: uuidv4(),
+        ...collection,
+      })
+    }
   }
-  const pCount = await database.collection('products').countDocuments()
-  if (pCount === 0) {
-    const now = new Date()
-    const catalog = [
-      { name: 'Nocturne Silk Slip Gown', collection: 'womenswear', price: 68000, image: 'https://images.pexels.com/photos/1655841/pexels-photo-1655841.jpeg', description: 'A liquid-silk floor-length gown, cut on the bias. Hand-rolled hems. Fully lined.' },
-      { name: 'Onyx Wool Tuxedo', collection: 'menswear', price: 124000, image: 'https://images.pexels.com/photos/32335610/pexels-photo-32335610.jpeg', description: 'A single-button tuxedo in Italian wool with grosgrain silk lapel. Half-canvassed.' },
-      { name: 'Ivory Cashmere Long Coat', collection: 'womenswear', price: 96000, image: 'https://images.pexels.com/photos/17542178/pexels-photo-17542178.jpeg', description: 'Pure cashmere long coat with hand-stitched edges. Notched lapel. Concealed placket.' },
-      { name: 'Midnight Leather Trench', collection: 'womenswear', price: 138000, image: 'https://images.pexels.com/photos/20591025/pexels-photo-20591025.jpeg', description: 'Full-grain nappa trench, softly draped, with a self-belt and turn-back cuffs.' },
-      { name: 'Ivory Poplin Blouse', collection: 'womenswear', price: 22000, image: 'https://images.pexels.com/photos/31450745/pexels-photo-31450745.jpeg', description: 'Crisp Italian cotton poplin. Mother-of-pearl buttons. French seams throughout.' },
-      { name: 'Charcoal Cashmere Roll-Neck', collection: 'menswear', price: 34000, image: 'https://images.pexels.com/photos/1453008/pexels-photo-1453008.jpeg', description: 'Fully-fashioned Grade-A cashmere roll-neck in a soft, dry hand.' },
-      { name: 'Noir Leather Tote', collection: 'accessories', price: 84000, image: 'https://images.pexels.com/photos/37467312/pexels-photo-37467312.jpeg', description: 'Vegetable-tanned leather tote with saddle-stitched handles. Suede-lined.' },
-      { name: 'Silk Twill Foulard', collection: 'accessories', price: 12800, image: 'https://images.pexels.com/photos/19729206/pexels-photo-19729206.jpeg', description: '90cm silk twill scarf with hand-rolled edges. Screen-printed in Como, Italy.' },
-      { name: 'Sculpted Gold Timepiece', collection: 'accessories', price: 168000, image: 'https://images.pexels.com/photos/6765639/pexels-photo-6765639.jpeg', description: 'Automatic movement. Sapphire crystal. Solid case in brushed pale gold.' },
-      { name: 'Obsidian Derby Shoe', collection: 'menswear', price: 58000, image: 'https://images.pexels.com/photos/135620/pexels-photo-135620.jpeg', description: 'Hand-lasted derby in polished box calf. Goodyear-welted leather soles.' },
-    ]
-    const docs = catalog.map((p, i) => ({
-      id: uuidv4(),
-      name: p.name,
-      slug: p.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
-      description: p.description,
-      collection: p.collection,
-      price: p.price,
-      salePrice: null,
-      onSale: false,
-      sku: `YSH-${(1000 + i).toString()}`,
-      stock: 12,
-      images: [p.image],
-      sizes: ['XS','S','M','L','XL'],
-      colors: ['Noir','Ivory','Champagne'],
-      material: 'Sourced from premier European mills.',
-      care: 'Professional dry-clean only. Store on a padded hanger.',
-      featured: i < 4,
-      createdAt: now,
-      lowStockThreshold: 3,
-    }))
-    await database.collection('products').insertMany(docs)
+
+  const now = new Date()
+  const catalog = [
+    { name: 'Nocturne Silk Slip Gown', collection: 'womenswear', price: 68000, image: 'https://images.pexels.com/photos/1655841/pexels-photo-1655841.jpeg', description: 'A liquid-silk floor-length gown, cut on the bias. Hand-rolled hems. Fully lined.' },
+    { name: 'Onyx Wool Tuxedo', collection: 'menswear', price: 124000, image: 'https://images.pexels.com/photos/32335610/pexels-photo-32335610.jpeg', description: 'A single-button tuxedo in Italian wool with grosgrain silk lapel. Half-canvassed.' },
+    { name: 'Ivory Cashmere Long Coat', collection: 'womenswear', price: 96000, image: 'https://images.pexels.com/photos/17542178/pexels-photo-17542178.jpeg', description: 'Pure cashmere long coat with hand-stitched edges. Notched lapel. Concealed placket.' },
+    { name: 'Midnight Leather Trench', collection: 'womenswear', price: 138000, image: 'https://images.pexels.com/photos/20591025/pexels-photo-20591025.jpeg', description: 'Full-grain nappa trench, softly draped, with a self-belt and turn-back cuffs.' },
+    { name: 'Ivory Poplin Blouse', collection: 'womenswear', price: 22000, image: 'https://images.pexels.com/photos/31450745/pexels-photo-31450745.jpeg', description: 'Crisp Italian cotton poplin. Mother-of-pearl buttons. French seams throughout.' },
+    { name: 'Charcoal Cashmere Roll-Neck', collection: 'menswear', price: 34000, image: 'https://images.pexels.com/photos/1453008/pexels-photo-1453008.jpeg', description: 'Fully-fashioned Grade-A cashmere roll-neck in a soft, dry hand.' },
+    { name: 'Noir Leather Tote', collection: 'accessories', price: 84000, image: 'https://images.pexels.com/photos/37467312/pexels-photo-37467312.jpeg', description: 'Vegetable-tanned leather tote with saddle-stitched handles. Suede-lined.' },
+    { name: 'Silk Twill Foulard', collection: 'accessories', price: 12800, image: 'https://images.pexels.com/photos/19729206/pexels-photo-19729206.jpeg', description: '90cm silk twill scarf with hand-rolled edges. Screen-printed in Como, Italy.' },
+    { name: 'Sculpted Gold Timepiece', collection: 'accessories', price: 168000, image: 'https://images.pexels.com/photos/6765639/pexels-photo-6765639.jpeg', description: 'Automatic movement. Sapphire crystal. Solid case in brushed pale gold.' },
+    { name: 'Obsidian Derby Shoe', collection: 'menswear', price: 58000, image: 'https://images.pexels.com/photos/135620/pexels-photo-135620.jpeg', description: 'Hand-lasted derby in polished box calf. Goodyear-welted leather soles.' },
+  ]
+
+  for (const product of catalog) {
+    const slug = product.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')
+    const existingProduct = await database.collection('products').findOne({ slug })
+    if (!existingProduct) {
+      await database.collection('products').insertOne({
+        id: uuidv4(),
+        name: product.name,
+        slug,
+        description: product.description,
+        collection: product.collection,
+        price: product.price,
+        salePrice: null,
+        onSale: false,
+        sku: `YSH-${uuidv4().slice(0, 6).toUpperCase()}`,
+        stock: 12,
+        images: [product.image],
+        sizes: ['XS','S','M','L','XL'],
+        colors: ['Noir','Ivory','Champagne'],
+        material: 'Sourced from premier European mills.',
+        care: 'Professional dry-clean only. Store on a padded hanger.',
+        sizeGuide: 'Please refer to your usual fit. If you are between sizes, we recommend sizing up for a relaxed drape. For bespoke fit guidance, contact our concierge.',
+        featured: catalog.indexOf(product) < 4,
+        createdAt: now,
+        lowStockThreshold: 3,
+      })
+    }
   }
   seeded = true
 }
@@ -268,6 +290,7 @@ async function route(req, method, segments) {
         colors: body.colors || ['Noir'],
         material: body.material || '',
         care: body.care || '',
+        sizeGuide: body.sizeGuide || '',
         featured: !!body.featured,
         lowStockThreshold: parseInt(body.lowStockThreshold) || 3,
         createdAt: new Date(),

@@ -1,0 +1,28 @@
+{
+	"folders": [
+		{
+			"path": "app"
+		},
+		{
+			"path": "components"
+		},
+		{
+			"path": "hooks"
+		},
+		{
+			"path": "lib"
+		},
+		{
+			"path": "memory"
+		},
+		{
+			"path": "node_modules"
+		},
+		{
+			"path": "test_reports"
+		},
+		{
+			"path": "tests"
+		}
+	]
+}
