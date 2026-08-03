@@ -577,15 +577,23 @@ async function route(req, method, segments) {
 
   if (root === 'inquiries') {
     if (method === 'POST' && rest.length === 0) {
+      const user = await getUserFromReq(req)
       const body = await parseBody(req)
-      const doc = { id: uuidv4(), name: body.name||'', email: body.email||'', phone: body.phone||'', subject: body.subject||'General Enquiry', message: body.message||'', productId: body.productId||null, status: 'New', response: '', createdAt: new Date() }
+      // Basic validation
+      if (!body.name || !body.email || !body.phone || !body.message) return json({ error: 'name, email, phone and message are required' }, 400)
+      const doc = { id: uuidv4(), userId: user?.id || null, name: body.name||'', email: body.email||'', phone: body.phone||'', subject: body.subject||'General Enquiry', message: body.message||'', productId: body.productId||null, status: 'New', response: '', createdAt: new Date() }
       await database.collection('inquiries').insertOne(doc)
       return json({ inquiry: stripId(doc) })
     }
     const user = await getUserFromReq(req)
-    const admErr = requireAdmin(user); if (admErr) return admErr
+    // Allow admin to list all enquiries; allow authenticated users to list their own
     if (method === 'GET') {
-      const items = (await database.collection('inquiries').find({}).sort({ createdAt: -1 }).toArray()).map(stripId)
+      if (!user) return json({ error: 'Unauthorized' }, 401)
+      if (user.role === 'admin') {
+        const items = (await database.collection('inquiries').find({}).sort({ createdAt: -1 }).toArray()).map(stripId)
+        return json({ inquiries: items })
+      }
+      const items = (await database.collection('inquiries').find({ userId: user.id }).sort({ createdAt: -1 }).toArray()).map(stripId)
       return json({ inquiries: items })
     }
     if (method === 'PUT' && rest.length === 1) {

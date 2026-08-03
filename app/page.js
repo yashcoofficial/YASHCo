@@ -1333,8 +1333,12 @@ function ConciergeView() {
   const { settings, api } = useApp()
   const [form, setForm] = useState({ name: '', email: '', phone: '', subject: '', message: '' })
   const submit = async () => {
-    try { await api('/inquiries', { method: 'POST', body: form }); toast.success('Your enquiry has been received.'); setForm({ name: '', email: '', phone: '', subject: '', message: '' }) }
-    catch (e) { toast.error(e.message) }
+    if (!form.name || !form.email || !form.phone || !form.message) { toast.error('Please fill name, email, phone and message'); return }
+    try {
+      await api('/inquiries', { method: 'POST', body: form })
+      toast.success('Your enquiry has been received.')
+      setForm({ name: '', email: '', phone: '', subject: '', message: '' })
+    } catch (e) { toast.error(e.message) }
   }
   // Layout-aware: render page sections above the form
   let pageSections = settings?.pageLayouts?.concierge?.sections || []
@@ -1424,7 +1428,7 @@ function DashboardView() {
       </div>
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList className="bg-transparent border-b border-border w-full justify-start rounded-none h-auto p-0">
-          {['orders', 'wishlist', 'addresses'].map(t => (
+          {['orders', 'wishlist', 'addresses', 'enquiries'].map(t => (
             <TabsTrigger key={t} value={t} className="rounded-none data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-accent tracking-editorial uppercase text-xs px-6 py-3">{t}</TabsTrigger>
           ))}
         </TabsList>
@@ -1477,6 +1481,9 @@ function DashboardView() {
         <TabsContent value="addresses" className="pt-8">
           <AddressManager addresses={addresses} setAddresses={setAddresses} />
         </TabsContent>
+        <TabsContent value="enquiries" className="pt-8">
+          <CustomerEnquiries />
+        </TabsContent>
       </Tabs>
     </div>
   )
@@ -1527,6 +1534,74 @@ function AddressManager({ addresses, setAddresses }) {
           <DialogFooter><Button className="rounded-none tracking-editorial uppercase text-xs" onClick={save}>Save</Button></DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  )
+}
+
+function CustomerEnquiries() {
+  const { api, user } = useApp()
+  const [inquiries, setInquiries] = useState([])
+  const [form, setForm] = useState({ name: user?.name || '', email: user?.email || '', phone: '', subject: '', message: '' })
+  const [loading, setLoading] = useState(false)
+
+  const load = async () => {
+    try {
+      const r = await api('/inquiries')
+      setInquiries(r.inquiries || [])
+    } catch (e) { /* ignore */ }
+  }
+
+  useEffect(() => { if (user) load() }, [user])
+
+  const submit = async () => {
+    if (!form.name || !form.email || !form.phone || !form.message) { toast.error('Please fill name, email, phone and message'); return }
+    setLoading(true)
+    try {
+      await api('/inquiries', { method: 'POST', body: form })
+      toast.success('Your enquiry has been sent')
+      setForm({ name: user?.name || '', email: user?.email || '', phone: '', subject: '', message: '' })
+      await load()
+    } catch (e) { toast.error(e.message) }
+    finally { setLoading(false) }
+  }
+
+  if (!user) return <div className="text-sm text-muted-foreground">Please sign in to view and send enquiries.</div>
+
+  return (
+    <div className="grid md:grid-cols-2 gap-8">
+      <div>
+        <h3 className="font-serif text-2xl mb-4">Send an Enquiry</h3>
+        <div className="space-y-3">
+          <Input placeholder="Full Name" className="rounded-none h-12" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
+          <div className="grid md:grid-cols-2 gap-4">
+            <Input placeholder="Email" className="rounded-none h-12" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
+            <Input placeholder="Phone" className="rounded-none h-12" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} />
+          </div>
+          <Input placeholder="Subject" className="rounded-none h-12" value={form.subject} onChange={e => setForm({ ...form, subject: e.target.value })} />
+          <Textarea placeholder="How may we assist?" rows={6} className="rounded-none" value={form.message} onChange={e => setForm({ ...form, message: e.target.value })} />
+          <Button className="rounded-none h-12 tracking-editorial uppercase text-xs px-10" onClick={submit} disabled={loading}>{loading ? 'Sending…' : 'Send Enquiry'}</Button>
+        </div>
+      </div>
+      <div>
+        <h3 className="font-serif text-2xl mb-4">Your Enquiries</h3>
+        {inquiries.length === 0
+          ? <div className="text-sm text-muted-foreground">No enquiries yet.</div>
+          : <div className="space-y-4">
+            {inquiries.map(q => (
+              <div key={q.id} className="border border-border p-4">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <div className="font-medium">{q.subject || 'Enquiry'}</div>
+                    <div className="text-xs text-muted-foreground">{new Date(q.createdAt).toLocaleString()}</div>
+                  </div>
+                  <Badge className="rounded-none bg-accent text-accent-foreground">{q.status || 'New'}</Badge>
+                </div>
+                <div className="mt-3 text-sm">{q.message}</div>
+                {q.response && <div className="mt-3 p-3 bg-muted text-sm">Admin: {q.response}</div>}
+              </div>
+            ))}
+          </div>}
+      </div>
     </div>
   )
 }
