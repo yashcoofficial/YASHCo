@@ -16,9 +16,6 @@
 			"path": "memory"
 		},
 		{
-			"path": "node_modules"
-		},
-		{
 			"path": "test_reports"
 		},
 		{

@@ -21,6 +21,7 @@ import {
 } from 'lucide-react'
 import { buildRouteForView, getBoutiqueNavItems, getVisibleNavItems, resolveViewFromPath } from '@/lib/navigation'
 import { validateCheckoutForm } from '@/lib/checkout-utils.mjs'
+import { getStockStatusText } from '@/lib/stock-utils'
 
 // ---------- Context ----------
 const AppCtx = createContext(null)
@@ -615,6 +616,7 @@ function HomeView() {
 function ProductCard({ p, overrideImage, aspectRatio }) {
   const { navigate, settings, toggleWishlist, wishlist } = useApp()
   const inWish = wishlist.includes(p.id)
+  const stockStatusText = getStockStatusText(p)
   return (
     <div className="group cursor-pointer" onClick={() => navigate('product', { id: p.id })}>
       <div className="img-zoom bg-muted relative overflow-hidden" style={{ aspectRatio: aspectRatio || '3/4' }}>
@@ -630,6 +632,7 @@ function ProductCard({ p, overrideImage, aspectRatio }) {
         <div className="text-sm">
           {p.salePrice ? <><span className="text-accent">{money(p.salePrice, settings.currencySymbol)}</span> <span className="line-through text-muted-foreground ml-2">{money(p.price, settings.currencySymbol)}</span></> : money(p.price, settings.currencySymbol)}
         </div>
+        {stockStatusText && <div className="text-[11px] tracking-editorial uppercase text-destructive">{stockStatusText}</div>}
         {p.colors?.length > 0 && (
           <div className="flex gap-1 pt-1">
             {p.colors.slice(0, 5).map(c => <span key={c} title={c} className="w-2.5 h-2.5 rounded-full border border-border" style={{ background: colorHex(c) }} />)}
@@ -881,6 +884,7 @@ function ProductView() {
 
   if (!product) return <div className="py-32 text-center text-muted-foreground">Loading...</div>
   const inWish = wishlist.includes(product.id)
+  const stockStatusText = getStockStatusText(product)
 
   return (
     <div className="max-w-[1400px] mx-auto px-4 md:px-8 py-8 md:py-16">
@@ -908,6 +912,7 @@ function ProductView() {
           <div className="mt-4 text-lg">
             {product.salePrice ? <><span className="text-accent">{money(product.salePrice, settings.currencySymbol)}</span> <span className="line-through text-muted-foreground ml-2">{money(product.price, settings.currencySymbol)}</span></> : money(product.price, settings.currencySymbol)}
           </div>
+          {stockStatusText && <div className="mt-3 inline-flex items-center rounded-none border border-destructive/30 bg-destructive/10 px-3 py-2 text-[11px] tracking-editorial uppercase text-destructive">{stockStatusText}</div>}
           <p className="text-muted-foreground mt-6 leading-relaxed">{product.description}</p>
 
           <div className="mt-8">
@@ -936,7 +941,7 @@ function ProductView() {
           </div>
 
           <div className="mt-8 flex gap-3">
-            <Button className="flex-1 rounded-none h-12 tracking-editorial uppercase text-xs" onClick={() => addToCart(product, size, color)}>Add to Bag</Button>
+            <Button className="flex-1 rounded-none h-12 tracking-editorial uppercase text-xs" onClick={() => addToCart(product, size, color)} disabled={Number(product.stock) <= 0}>{Number(product.stock) <= 0 ? 'Out of Stock' : 'Add to Bag'}</Button>
             <Button variant="outline" className="rounded-none h-12 w-12 p-0" onClick={() => toggleWishlist(product.id)}>
               <Heart className={cx('w-4 h-4', inWish && 'fill-accent text-accent')} />
             </Button>
@@ -1248,7 +1253,7 @@ function AdminLoginView() {
 
 function RegisterView() {
   const { api, setAuth, navigate } = useApp()
-  const [form, setForm] = useState({ name: '', email: '', password: '' })
+  const [form, setForm] = useState({ name: '', email: '', phone: '', password: '' })
   const [loading, setLoading] = useState(false)
   const submit = async () => {
     setLoading(true)
@@ -1261,6 +1266,7 @@ function RegisterView() {
       <div className="space-y-4">
         <Input placeholder="Full Name" className="rounded-none h-12" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
         <Input placeholder="Email" className="rounded-none h-12" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
+        <Input placeholder="Phone Number" className="rounded-none h-12" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} />
         <Input type="password" placeholder="Password" className="rounded-none h-12" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} />
         <Button disabled={loading} className="w-full rounded-none h-12 tracking-editorial uppercase text-xs" onClick={submit}>{loading ? 'Creating account…' : 'Create Account'}</Button>
         <div className="text-xs text-center pt-2"><button className="underline" onClick={() => navigate('login')}>Already have an account?</button></div>
@@ -1623,7 +1629,7 @@ function AdminView() {
       </div>
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList className="bg-transparent border-b border-border w-full justify-start rounded-none h-auto p-0 flex-wrap">
-          {['overview', 'products', 'collections', 'orders', 'inquiries', 'settings', 'page-studio'].map(t => (
+          {['overview', 'products', 'collections', 'orders', 'clients', 'inquiries', 'settings', 'page-studio'].map(t => (
             <TabsTrigger key={t} value={t} className="rounded-none data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-accent tracking-editorial uppercase text-xs px-6 py-3">{t === 'page-studio' ? 'Page Studio' : t}</TabsTrigger>
           ))}
         </TabsList>
@@ -1631,6 +1637,7 @@ function AdminView() {
         <TabsContent value="products" className="pt-8"><AdminProducts /></TabsContent>
         <TabsContent value="collections" className="pt-8"><AdminCollections /></TabsContent>
         <TabsContent value="orders" className="pt-8"><AdminOrders /></TabsContent>
+        <TabsContent value="clients" className="pt-8"><AdminClients /></TabsContent>
         <TabsContent value="inquiries" className="pt-8"><AdminInquiries /></TabsContent>
         <TabsContent value="settings" className="pt-8"><AdminSettings /></TabsContent>
         <TabsContent value="page-studio" className="pt-8"><AdminPageStudio /></TabsContent>
@@ -1862,6 +1869,32 @@ function AdminOrders() {
           <DialogFooter><Button className="rounded-none" onClick={save}>Update</Button></DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  )
+}
+
+function AdminClients() {
+  const { api } = useApp()
+  const [clients, setClients] = useState([])
+  const reload = () => api('/users').then(r => setClients(r.users || []))
+  useEffect(() => { reload() }, [])
+  return (
+    <div>
+      <h3 className="font-serif text-2xl mb-6">Clients ({clients.length})</h3>
+      <div className="grid gap-2">
+        {clients.map(client => (
+          <div key={client.id} className="grid grid-cols-[1.2fr_1.2fr_1fr_auto] gap-4 items-center border border-border p-4">
+            <div>
+              <div className="font-serif text-lg">{client.name || 'Unnamed client'}</div>
+              <div className="text-xs text-muted-foreground">Joined {new Date(client.createdAt).toLocaleDateString()}</div>
+            </div>
+            <div className="text-sm break-all">{client.email || '—'}</div>
+            <div className="text-sm">{client.phone || '—'}</div>
+            <Badge className="rounded-none bg-muted text-foreground">{client.role === 'admin' ? 'Admin' : 'Client'}</Badge>
+          </div>
+        ))}
+        {clients.length === 0 && <div className="text-muted-foreground text-sm py-12 text-center">No clients yet.</div>}
+      </div>
     </div>
   )
 }

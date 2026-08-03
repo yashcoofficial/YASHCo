@@ -336,12 +336,12 @@ async function route(req, method, segments) {
     const action = rest[0]
     if (action === 'register' && method === 'POST') {
       const body = await parseBody(req)
-      const { email, password, name } = body
+      const { email, password, name, phone } = body
       if (!email || !password) return json({ error: 'Email and password required' }, 400)
       const exists = await database.collection('users').findOne({ email: email.toLowerCase() })
       if (exists) return json({ error: 'Email already registered' }, 400)
       const { salt, hash } = hashPassword(password)
-      const user = { id: uuidv4(), email: email.toLowerCase(), name: name || email.split('@')[0], role: 'customer', passwordSalt: salt, passwordHash: hash, createdAt: new Date() }
+      const user = { id: uuidv4(), email: email.toLowerCase(), name: name || email.split('@')[0], phone: phone || '', role: 'customer', passwordSalt: salt, passwordHash: hash, createdAt: new Date() }
       await database.collection('users').insertOne(user)
       const token = createJwt({ sub: user.id, role: user.role, email: user.email })
       const expiresAt = new Date(Date.now() + 1000*60*60*24*30)
@@ -468,6 +468,15 @@ async function route(req, method, segments) {
     if (method === 'DELETE' && rest.length === 1) {
       await database.collection('products').deleteOne({ id: rest[0] })
       return json({ ok: true })
+    }
+  }
+
+  if (root === 'users') {
+    const user = await getUserFromReq(req)
+    const admErr = requireAdmin(user); if (admErr) return admErr
+    if (method === 'GET' && rest.length === 0) {
+      const items = (await database.collection('users').find({ role: { $ne: 'admin' } }).sort({ createdAt: -1 }).toArray()).map(stripId)
+      return json({ users: items })
     }
   }
 
