@@ -20,6 +20,7 @@ import {
   GripVertical, Eye, EyeOff,
 } from 'lucide-react'
 import { buildRouteForView, getBoutiqueNavItems, getVisibleNavItems, resolveViewFromPath } from '@/lib/navigation'
+import { validateCheckoutForm } from '@/lib/checkout-utils.mjs'
 
 // ---------- Context ----------
 const AppCtx = createContext(null)
@@ -83,6 +84,8 @@ export default function App() {
   const [wishlist, setWishlist] = useState([])
   const [menuOpen, setMenuOpen] = useState(false)
   const [cartOpen, setCartOpen] = useState(false)
+  const [authModalOpen, setAuthModalOpen] = useState(false)
+  const [pendingCheckout, setPendingCheckout] = useState(false)
   const [transparentLogo, setTransparentLogo] = useState(null)
   const [allProducts, setAllProducts] = useState([])
 
@@ -104,7 +107,7 @@ export default function App() {
     }
   }, [])
 
-  const navigate = (name, params = {}) => {
+  const navigate = useCallback((name, params = {}) => {
     const nextView = { name, params }
     setView(nextView)
     setMenuOpen(false)
@@ -113,7 +116,7 @@ export default function App() {
       updateUrlForView(nextView, 'push')
       window.scrollTo({ top: 0, behavior: 'smooth' })
     }
-  }
+  }, [updateUrlForView])
 
   // Load initial
   useEffect(() => {
@@ -211,7 +214,21 @@ export default function App() {
   const setAuth = (tok, u) => {
     if (tok) localStorage.setItem('yash_token', tok); else localStorage.removeItem('yash_token')
     setToken(tok || null); setUser(u || null)
+    if (pendingCheckout && tok) {
+      setPendingCheckout(false)
+      setAuthModalOpen(false)
+      navigate('checkout')
+    }
   }
+
+  const requestCheckoutAccess = useCallback(() => {
+    if (!user) {
+      setPendingCheckout(true)
+      setAuthModalOpen(true)
+      return
+    }
+    navigate('checkout')
+  }, [navigate, user])
 
   const addToCart = (product, size, color, qty = 1) => {
     setCart(prev => {
@@ -237,13 +254,14 @@ export default function App() {
     api('/wishlist').then(r => setWishlist(r.productIds || [])).catch(() => { })
   }, [user, api])
 
-  const ctxValue = { view, navigate, user, token, setAuth, settings, setSettings, collections, setCollections, cart, addToCart, updateQty, removeFromCart, clearCart, wishlist, toggleWishlist, api, cartOpen, setCartOpen, menuOpen, setMenuOpen, transparentLogo, allProducts, setAllProducts }
+  const ctxValue = { view, navigate, user, token, setAuth, settings, setSettings, collections, setCollections, cart, addToCart, updateQty, removeFromCart, clearCart, wishlist, toggleWishlist, api, cartOpen, setCartOpen, menuOpen, setMenuOpen, transparentLogo, allProducts, setAllProducts, authModalOpen, setAuthModalOpen, pendingCheckout, setPendingCheckout, requestCheckoutAccess }
 
   if (!settings) return <div className="min-h-screen flex items-center justify-center bg-background"><Loader /></div>
 
   return (
     <AppCtx.Provider value={ctxValue}>
       <Toaster position="top-center" toastOptions={{ className: 'font-sans text-sm' }} />
+      <AuthGateModal />
       <AnnouncementBar />
       <Header />
       <CartDrawer />
@@ -271,6 +289,47 @@ export default function App() {
 }
 
 function Loader() { return <div className="text-foreground/60 text-xs tracking-luxe uppercase">YASH</div> }
+
+function AuthGateModal() {
+  const { api, setAuth, navigate, authModalOpen, setAuthModalOpen, pendingCheckout, setPendingCheckout } = useApp()
+  const [form, setForm] = useState({ email: '', password: '' })
+  const [loading, setLoading] = useState(false)
+
+  const submit = async () => {
+    setLoading(true)
+    try {
+      const r = await api('/auth/login', { method: 'POST', body: form })
+      setAuth(r.token, r.user)
+      toast.success(`Welcome, ${r.user.name}`)
+      if (!pendingCheckout) {
+        navigate(r.user.role === 'admin' ? 'admin' : 'dashboard')
+      }
+    } catch (e) {
+      toast.error(e.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <Dialog open={authModalOpen} onOpenChange={(open) => { setAuthModalOpen(open); if (!open) setPendingCheckout(false) }}>
+      <DialogContent className="rounded-none max-w-md">
+        <DialogHeader>
+          <DialogTitle className="font-serif text-2xl">Sign in to continue</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 mt-2">
+          <Input placeholder="Email" className="rounded-none h-12" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
+          <Input type="password" placeholder="Password" className="rounded-none h-12" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} />
+          <Button disabled={loading} className="w-full rounded-none h-12 tracking-editorial uppercase text-xs" onClick={submit}>{loading ? 'Signing in…' : 'Continue'}</Button>
+          <div className="flex justify-between text-xs pt-2">
+            <button className="underline" onClick={() => { setAuthModalOpen(false); setPendingCheckout(false); navigate('forgot') }}>Forgot password?</button>
+            <button className="underline" onClick={() => { setAuthModalOpen(false); setPendingCheckout(false); navigate('register') }}>Create account</button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
 
 // ---------- Header ----------
 function AnnouncementBar() {
@@ -343,7 +402,7 @@ function MobileMenu() {
 }
 
 function CartDrawer() {
-  const { cartOpen, setCartOpen, cart, updateQty, removeFromCart, navigate, settings } = useApp()
+  const { cartOpen, setCartOpen, cart, updateQty, removeFromCart, navigate, settings, requestCheckoutAccess } = useApp()
   const subtotal = cart.reduce((s, x) => s + x.price * x.qty, 0)
   return (
     <Sheet open={cartOpen} onOpenChange={setCartOpen}>
@@ -383,7 +442,7 @@ function CartDrawer() {
             <div className="border-t border-border pt-4 space-y-4">
               <div className="flex justify-between text-sm"><span className="tracking-editorial uppercase text-xs">Subtotal</span><span>{money(subtotal, settings.currencySymbol)}</span></div>
               <div className="text-xs text-muted-foreground">Shipping & taxes calculated at checkout.</div>
-              <Button className="w-full rounded-none h-12 tracking-editorial uppercase text-xs" onClick={() => { setCartOpen(false); navigate('checkout') }}>Proceed to Checkout</Button>
+              <Button className="w-full rounded-none h-12 tracking-editorial uppercase text-xs" onClick={() => { setCartOpen(false); requestCheckoutAccess() }}>Proceed to Checkout</Button>
             </div>
           </>}
       </SheetContent>
@@ -430,7 +489,7 @@ function HomeView() {
   const renderSection = (id) => {
     switch (id) {
       case 'hero': return (
-        <section key="hero" className="hero-home-banner relative -mt-20 overflow-hidden" style={{ '--hero-height': heroH }}>
+        <section key="hero" className="hero-home-banner relative mt-0 sm:-mt-20 overflow-hidden" style={{ '--hero-height': heroH }}>
           <picture className="absolute inset-0 block h-full w-full">
             <source media="(max-width: 767px)" srcSet={heroImageMobile} />
             <source media="(min-width: 768px)" srcSet={heroImageDesktop} />
@@ -934,7 +993,7 @@ function InquiryDialog({ open, onOpenChange, productId, productName }) {
 
 // ---------- Cart ----------
 function CartView() {
-  const { cart, updateQty, removeFromCart, navigate, settings } = useApp()
+  const { cart, updateQty, removeFromCart, navigate, settings, requestCheckoutAccess } = useApp()
   const subtotal = cart.reduce((s, x) => s + x.price * x.qty, 0)
   return (
     <div className="max-w-4xl mx-auto px-4 md:px-8 py-16">
@@ -966,7 +1025,7 @@ function CartView() {
             <div className="w-full md:w-96 space-y-4">
               <div className="flex justify-between"><span className="tracking-editorial uppercase text-xs">Subtotal</span><span>{money(subtotal, settings.currencySymbol)}</span></div>
               <div className="text-xs text-muted-foreground">Complimentary shipping applied.</div>
-              <Button className="w-full rounded-none h-12 tracking-editorial uppercase text-xs" onClick={() => navigate('checkout')}>Proceed to Checkout</Button>
+              <Button className="w-full rounded-none h-12 tracking-editorial uppercase text-xs" onClick={() => requestCheckoutAccess()}>Proceed to Checkout</Button>
             </div>
           </div>
         </>}
@@ -976,18 +1035,34 @@ function CartView() {
 
 // ---------- Checkout ----------
 function CheckoutView() {
-  const { cart, user, settings, api, navigate, clearCart } = useApp()
+  const { cart, user, settings, api, navigate, clearCart, requestCheckoutAccess } = useApp()
   const [form, setForm] = useState({
     customerName: user?.name || '', customerEmail: user?.email || '', customerPhone: '',
     line1: '', line2: '', city: '', state: '', pincode: '', country: 'India', notes: ''
   })
   const [submitting, setSubmitting] = useState(false)
+  const [submitAttempted, setSubmitAttempted] = useState(false)
   const subtotal = cart.reduce((s, x) => s + x.price * x.qty, 0)
   const total = subtotal
+  const validation = useMemo(() => validateCheckoutForm(form), [form])
+  const errors = submitAttempted ? validation.errors : {}
+
+  useEffect(() => {
+    if (!user && cart.length > 0) requestCheckoutAccess()
+  }, [user, cart.length, requestCheckoutAccess])
+
+  useEffect(() => {
+    setForm(prev => ({ ...prev, customerName: user?.name || prev.customerName, customerEmail: user?.email || prev.customerEmail }))
+  }, [user])
 
   if (cart.length === 0) return <div className="text-center py-32 text-muted-foreground">Your bag is empty. <button className="underline ml-2" onClick={() => navigate('shop')}>Continue shopping →</button></div>
 
   const submit = async () => {
+    setSubmitAttempted(true)
+    if (!validation.isValid) {
+      toast.error('Please complete the required checkout details before continuing.')
+      return
+    }
     setSubmitting(true)
     try {
       const r = await api('/orders', {
@@ -1011,19 +1086,40 @@ function CheckoutView() {
           <section>
             <h2 className="font-serif text-2xl mb-4">Contact</h2>
             <div className="grid md:grid-cols-2 gap-4">
-              <Input placeholder="Full Name" className="rounded-none" value={form.customerName} onChange={e => setForm({ ...form, customerName: e.target.value })} />
-              <Input placeholder="Email" className="rounded-none" value={form.customerEmail} onChange={e => setForm({ ...form, customerEmail: e.target.value })} />
-              <Input placeholder="Phone" className="rounded-none md:col-span-2" value={form.customerPhone} onChange={e => setForm({ ...form, customerPhone: e.target.value })} />
+              <div>
+                <Input placeholder="Full Name" className={cx('rounded-none', errors.customerName && 'border-red-500')} value={form.customerName} onChange={e => setForm({ ...form, customerName: e.target.value })} />
+                {errors.customerName && <p className="text-xs text-red-600 mt-2">{errors.customerName}</p>}
+              </div>
+              <div>
+                <Input placeholder="Email" className={cx('rounded-none', errors.customerEmail && 'border-red-500')} value={form.customerEmail} onChange={e => setForm({ ...form, customerEmail: e.target.value })} />
+                {errors.customerEmail && <p className="text-xs text-red-600 mt-2">{errors.customerEmail}</p>}
+              </div>
+              <div className="md:col-span-2">
+                <Input placeholder="Phone" className={cx('rounded-none', errors.customerPhone && 'border-red-500')} value={form.customerPhone} onChange={e => setForm({ ...form, customerPhone: e.target.value })} />
+                {errors.customerPhone && <p className="text-xs text-red-600 mt-2">{errors.customerPhone}</p>}
+              </div>
             </div>
           </section>
           <section>
             <h2 className="font-serif text-2xl mb-4">Shipping Address</h2>
             <div className="grid md:grid-cols-2 gap-4">
-              <Input placeholder="Address Line 1" className="rounded-none md:col-span-2" value={form.line1} onChange={e => setForm({ ...form, line1: e.target.value })} />
+              <div className="md:col-span-2">
+                <Input placeholder="Address Line 1" className={cx('rounded-none', errors.line1 && 'border-red-500')} value={form.line1} onChange={e => setForm({ ...form, line1: e.target.value })} />
+                {errors.line1 && <p className="text-xs text-red-600 mt-2">{errors.line1}</p>}
+              </div>
               <Input placeholder="Address Line 2 (optional)" className="rounded-none md:col-span-2" value={form.line2} onChange={e => setForm({ ...form, line2: e.target.value })} />
-              <Input placeholder="City" className="rounded-none" value={form.city} onChange={e => setForm({ ...form, city: e.target.value })} />
-              <Input placeholder="State" className="rounded-none" value={form.state} onChange={e => setForm({ ...form, state: e.target.value })} />
-              <Input placeholder="PIN Code" className="rounded-none" value={form.pincode} onChange={e => setForm({ ...form, pincode: e.target.value })} />
+              <div>
+                <Input placeholder="City" className={cx('rounded-none', errors.city && 'border-red-500')} value={form.city} onChange={e => setForm({ ...form, city: e.target.value })} />
+                {errors.city && <p className="text-xs text-red-600 mt-2">{errors.city}</p>}
+              </div>
+              <div>
+                <Input placeholder="State" className={cx('rounded-none', errors.state && 'border-red-500')} value={form.state} onChange={e => setForm({ ...form, state: e.target.value })} />
+                {errors.state && <p className="text-xs text-red-600 mt-2">{errors.state}</p>}
+              </div>
+              <div>
+                <Input placeholder="PIN Code" className={cx('rounded-none', errors.pincode && 'border-red-500')} value={form.pincode} onChange={e => setForm({ ...form, pincode: e.target.value })} />
+                {errors.pincode && <p className="text-xs text-red-600 mt-2">{errors.pincode}</p>}
+              </div>
               <Input placeholder="Country" className="rounded-none" value={form.country} onChange={e => setForm({ ...form, country: e.target.value })} />
             </div>
           </section>
@@ -1054,7 +1150,7 @@ function CheckoutView() {
           <div className="mt-6 text-xs text-muted-foreground bg-background/70 p-4 border border-border">
             Payment is arranged privately by our concierge after your order is confirmed. Submitting this form places a reserved enquiry with the atelier.
           </div>
-          <Button disabled={submitting} className="w-full rounded-none h-12 tracking-editorial uppercase text-xs mt-6" onClick={submit}>{submitting ? 'Submitting…' : 'Place Enquiry Order'}</Button>
+          <Button disabled={submitting || !validation.isValid || !user} className="w-full rounded-none h-12 tracking-editorial uppercase text-xs mt-6" onClick={submit}>{submitting ? 'Submitting…' : !user ? 'Sign in to continue' : validation.isValid ? 'Place Enquiry Order' : 'Complete details'}</Button>
         </aside>
       </div>
     </div>
@@ -1095,16 +1191,19 @@ function AuthLayout({ title, sub, children }) {
 function LoginView() {
   const { api, setAuth, navigate } = useApp()
   const [form, setForm] = useState({ email: '', password: '' })
+  const [loading, setLoading] = useState(false)
   const submit = async () => {
+    setLoading(true)
     try { const r = await api('/auth/login', { method: 'POST', body: form }); setAuth(r.token, r.user); toast.success(`Welcome, ${r.user.name}`); navigate(r.user.role === 'admin' ? 'admin' : 'dashboard') }
     catch (e) { toast.error(e.message) }
+    finally { setLoading(false) }
   }
   return (
     <AuthLayout title="Sign In" sub="Access your private account">
       <div className="space-y-4">
         <Input placeholder="Email" className="rounded-none h-12" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
         <Input type="password" placeholder="Password" className="rounded-none h-12" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} />
-        <Button className="w-full rounded-none h-12 tracking-editorial uppercase text-xs" onClick={submit}>Sign In</Button>
+        <Button disabled={loading} className="w-full rounded-none h-12 tracking-editorial uppercase text-xs" onClick={submit}>{loading ? 'Signing in…' : 'Sign In'}</Button>
         <div className="flex justify-between text-xs pt-2">
           <button className="underline" onClick={() => navigate('forgot')}>Forgot password?</button>
           <button className="underline" onClick={() => navigate('register')}>Create an account</button>
@@ -1150,9 +1249,12 @@ function AdminLoginView() {
 function RegisterView() {
   const { api, setAuth, navigate } = useApp()
   const [form, setForm] = useState({ name: '', email: '', password: '' })
+  const [loading, setLoading] = useState(false)
   const submit = async () => {
+    setLoading(true)
     try { const r = await api('/auth/register', { method: 'POST', body: form }); setAuth(r.token, r.user); toast.success('Welcome to YASH'); navigate('dashboard') }
     catch (e) { toast.error(e.message) }
+    finally { setLoading(false) }
   }
   return (
     <AuthLayout title="Create Account" sub="Join our private clientele">
@@ -1160,7 +1262,7 @@ function RegisterView() {
         <Input placeholder="Full Name" className="rounded-none h-12" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
         <Input placeholder="Email" className="rounded-none h-12" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
         <Input type="password" placeholder="Password" className="rounded-none h-12" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} />
-        <Button className="w-full rounded-none h-12 tracking-editorial uppercase text-xs" onClick={submit}>Create Account</Button>
+        <Button disabled={loading} className="w-full rounded-none h-12 tracking-editorial uppercase text-xs" onClick={submit}>{loading ? 'Creating account…' : 'Create Account'}</Button>
         <div className="text-xs text-center pt-2"><button className="underline" onClick={() => navigate('login')}>Already have an account?</button></div>
       </div>
     </AuthLayout>
@@ -1170,24 +1272,27 @@ function RegisterView() {
 function ForgotView() {
   const { api, navigate } = useApp()
   const [email, setEmail] = useState('')
-  const [token, setToken] = useState('')
+  const [sent, setSent] = useState(false)
+  const [loading, setLoading] = useState(false)
   const submit = async () => {
+    setLoading(true)
     try {
       const r = await api('/auth/forgot', { method: 'POST', body: { email } })
-      if (r.mockedResetToken) { setToken(r.mockedResetToken); toast.success('Reset token generated (email mocked)') }
-      else toast.success(r.message)
+      setSent(true)
+      toast.success(r.message || 'Reset instructions have been sent to your inbox.')
     } catch (e) { toast.error(e.message) }
+    finally { setLoading(false) }
   }
   return (
     <AuthLayout title="Password Recovery" sub="We will send you a private link">
       <div className="space-y-4">
         <Input placeholder="Email" className="rounded-none h-12" value={email} onChange={e => setEmail(e.target.value)} />
-        <Button className="w-full rounded-none h-12 tracking-editorial uppercase text-xs" onClick={submit}>Send Reset Link</Button>
-        {token && (
-          <div className="text-xs bg-muted/40 p-4 border border-border">
-            <div className="tracking-editorial uppercase mb-2 text-accent">Mocked Email — copy this token</div>
-            <div className="font-mono break-all mb-3">{token}</div>
-            <Button variant="outline" className="rounded-none w-full" onClick={() => { navigator.clipboard.writeText(token); navigate('reset') }}>Copy & Continue →</Button>
+        <Button disabled={loading} className="w-full rounded-none h-12 tracking-editorial uppercase text-xs" onClick={submit}>{loading ? 'Preparing reset…' : 'Send Reset Link'}</Button>
+        {sent && (
+          <div className="text-xs bg-muted/40 p-4 border border-border space-y-3">
+            <div className="tracking-editorial uppercase text-accent">Email sent</div>
+            <div className="text-sm text-muted-foreground">Please check your inbox for a secure link to continue. If it doesn’t arrive within a couple of minutes, try again.</div>
+            <Button variant="outline" className="rounded-none w-full" onClick={() => navigate('reset')}>Continue to reset form →</Button>
           </div>
         )}
         <div className="text-xs text-center"><button className="underline" onClick={() => navigate('login')}>Back to sign in</button></div>
@@ -1199,16 +1304,25 @@ function ForgotView() {
 function ResetView() {
   const { api, navigate } = useApp()
   const [form, setForm] = useState({ token: '', newPassword: '' })
+  const [loading, setLoading] = useState(false)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    const token = params.get('token')
+    if (token) setForm(prev => ({ ...prev, token }))
+  }, [])
   const submit = async () => {
+    setLoading(true)
     try { await api('/auth/reset', { method: 'POST', body: form }); toast.success('Password reset. Please sign in.'); navigate('login') }
     catch (e) { toast.error(e.message) }
+    finally { setLoading(false) }
   }
   return (
-    <AuthLayout title="Set New Password">
+    <AuthLayout title="Set New Password" sub="Use the secure link from your email to continue">
       <div className="space-y-4">
         <Input placeholder="Reset Token (paste)" className="rounded-none h-12 font-mono text-xs" value={form.token} onChange={e => setForm({ ...form, token: e.target.value })} />
         <Input type="password" placeholder="New Password" className="rounded-none h-12" value={form.newPassword} onChange={e => setForm({ ...form, newPassword: e.target.value })} />
-        <Button className="w-full rounded-none h-12 tracking-editorial uppercase text-xs" onClick={submit}>Reset Password</Button>
+        <Button disabled={loading} className="w-full rounded-none h-12 tracking-editorial uppercase text-xs" onClick={submit}>{loading ? 'Resetting…' : 'Reset Password'}</Button>
       </div>
     </AuthLayout>
   )
@@ -1628,19 +1742,24 @@ function AdminOrders() {
   const save = async () => {
     try { await api(`/orders/${editing.id}`, { method: 'PUT', body: { status: editing.status, trackingNumber: editing.trackingNumber, adminNotes: editing.adminNotes, historyNote: editing.historyNote } }); toast.success('Updated'); setEditing(null); reload() } catch (e) { toast.error(e.message) }
   }
+  const remove = async (id) => {
+    if (!confirm('Delete this order?')) return
+    try { await api(`/orders/${id}`, { method: 'DELETE' }); toast.success('Order deleted'); reload() } catch (e) { toast.error(e.message) }
+  }
   return (
     <div>
       <h3 className="font-serif text-2xl mb-6">All Orders ({orders.length})</h3>
       <div className="space-y-2">
         {orders.map(o => (
-          <div key={o.id} className="grid grid-cols-[1fr_auto_auto_auto] gap-4 items-center border border-border p-4">
+          <div key={o.id} className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-4 items-center border border-border p-4">
             <div>
               <div className="font-serif text-lg">{o.orderNumber}</div>
               <div className="text-xs text-muted-foreground">{o.customerName} · {o.customerEmail} · {new Date(o.createdAt).toLocaleDateString()}</div>
             </div>
             <div className="text-sm">{money(o.total, settings.currencySymbol)}</div>
             <Badge className="rounded-none bg-accent text-accent-foreground">{o.status}</Badge>
-            <Button size="sm" variant="outline" className="rounded-none" onClick={() => setEditing({ ...o, historyNote: '' })}>Manage</Button>
+            <Button size="sm" variant="outline" className="rounded-none" onClick={() => setEditing({ ...o, historyNote: '' })}>Edit</Button>
+            <Button size="sm" variant="outline" className="rounded-none" onClick={() => remove(o.id)}><Trash2 className="w-3.5 h-3.5" /></Button>
           </div>
         ))}
         {orders.length === 0 && <div className="text-muted-foreground text-sm py-12 text-center">No orders yet.</div>}

@@ -77,9 +77,9 @@
 
   @media (max-width: 767px) {
     .hero-home-banner {
-      min-height: 78vh !important;
-      height: 78vh !important;
-      margin-top: -5rem !important;
+      min-height: 100dvh !important;
+      height: 100dvh !important;
+      margin-top: 0 !important;
     }
 
     .hero-home-copy {

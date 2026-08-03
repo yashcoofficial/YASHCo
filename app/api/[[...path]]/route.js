@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { MongoClient } from 'mongodb'
 import crypto from 'crypto'
+import nodemailer from 'nodemailer'
 import { v4 as uuidv4 } from 'uuid'
 import { DEFAULT_NAV_ITEMS } from '@/lib/navigation'
 
@@ -25,6 +26,36 @@ async function db() {
 }
 
 // ---------- Auth helpers ----------
+const JWT_SECRET = process.env.JWT_SECRET || 'local-dev-secret-change-me'
+const LOGIN_WINDOW_MS = 1000 * 60 * 15
+const MAX_LOGIN_ATTEMPTS = 5
+const loginAttemptTracker = new Map()
+
+function base64Url(value) {
+  return Buffer.from(value).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '')
+}
+function createJwt(payload, expiresInSeconds = 60 * 60 * 24 * 30) {
+  const header = { alg: 'HS256', typ: 'JWT' }
+  const now = Math.floor(Date.now() / 1000)
+  const body = { ...payload, iat: now, exp: now + expiresInSeconds }
+  const encodedHeader = base64Url(JSON.stringify(header))
+  const encodedPayload = base64Url(JSON.stringify(body))
+  const signature = crypto.createHmac('sha256', JWT_SECRET).update(`${encodedHeader}.${encodedPayload}`).digest('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '')
+  return `${encodedHeader}.${encodedPayload}.${signature}`
+}
+function verifyJwt(token) {
+  try {
+    const [header, payload, signature] = token.split('.')
+    if (!header || !payload || !signature) return null
+    const expected = crypto.createHmac('sha256', JWT_SECRET).update(`${header}.${payload}`).digest('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '')
+    if (expected !== signature) return null
+    const decoded = JSON.parse(Buffer.from(payload.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8'))
+    if (decoded.exp && decoded.exp < Math.floor(Date.now() / 1000)) return null
+    return decoded
+  } catch {
+    return null
+  }
+}
 function hashPassword(password, saltHex) {
   const salt = saltHex || crypto.randomBytes(16).toString('hex')
   const derived = crypto.scryptSync(password, salt, 64).toString('hex')
@@ -34,12 +65,115 @@ function verifyPassword(password, salt, expectedHash) {
   const derived = crypto.scryptSync(password, salt, 64).toString('hex')
   return crypto.timingSafeEqual(Buffer.from(derived, 'hex'), Buffer.from(expectedHash, 'hex'))
 }
+function createTokenHash(token) {
+  return crypto.createHash('sha256').update(token).digest('hex')
+}
+function getClientIp(req) {
+  return req.headers.get('x-forwarded-for')?.split(',')[0].trim() || req.headers.get('x-real-ip') || 'local'
+}
+function checkLoginRateLimit(req, email) {
+  const key = `login:${getClientIp(req)}:${(email || '').toLowerCase()}`
+  const now = Date.now()
+  const current = loginAttemptTracker.get(key)
+  if (!current || current.expiresAt <= now) {
+    loginAttemptTracker.set(key, { count: 1, expiresAt: now + LOGIN_WINDOW_MS })
+    return true
+  }
+  if (current.count >= MAX_LOGIN_ATTEMPTS) return false
+  current.count += 1
+  loginAttemptTracker.set(key, current)
+  return true
+}
+function resetLoginRateLimit(req, email) {
+  const key = `login:${getClientIp(req)}:${(email || '').toLowerCase()}`
+  loginAttemptTracker.delete(key)
+}
+function parseUserAgent(req) {
+  const ua = req.headers.get('user-agent') || ''
+  const browser = ua.includes('Chrome') ? 'Chrome' : ua.includes('Firefox') ? 'Firefox' : ua.includes('Safari') ? 'Safari' : ua.includes('Edge') ? 'Edge' : 'Unknown'
+  const device = ua.includes('iPhone') ? 'iPhone' : ua.includes('Android') ? 'Android' : ua.includes('Mac') ? 'Mac' : ua.includes('Windows') ? 'Windows' : 'Desktop'
+  return { browser, device }
+}
+async function sendEmail({ to, from, subject, text, html }) {
+  const recipients = Array.isArray(to) ? to : [to]
+  const mailFrom = from || process.env.EMAIL_FROM || 'concierge@yashatelier.store'
+
+  if (process.env.RESEND_API_KEY) {
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: mailFrom,
+        to: recipients,
+        subject,
+        text,
+        html,
+      }),
+    })
+    if (!response.ok) throw new Error('Email provider rejected the request')
+    return { ok: true, provider: 'resend' }
+  }
+
+  if (process.env.SMTP_HOST) {
+    const transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: Number(process.env.SMTP_PORT || 587),
+      secure: String(process.env.SMTP_SECURE || 'false').toLowerCase() === 'true',
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
+      },
+    })
+    await transporter.sendMail({
+      from: mailFrom,
+      to: recipients.join(', '),
+      subject,
+      text,
+      html,
+    })
+    return { ok: true, provider: 'smtp' }
+  }
+
+  console.info(`[mail] to=${recipients.join(', ')} from=${mailFrom} subject=${subject}`)
+  return { ok: true, provider: 'console' }
+}
+async function sendLoginSuccessEmail(user, req) {
+  const { browser, device } = parseUserAgent(req)
+  const forwardedFor = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || ''
+  const ip = forwardedFor.split(',')[0].trim() || 'Unavailable'
+  const location = req.headers.get('x-vercel-ip-country') || req.headers.get('x-vercel-ip-city') || 'Unavailable'
+  const body = [
+    'Your account was accessed successfully.',
+    '',
+    `Time: ${new Date().toISOString()}`,
+    `Device: ${device}`,
+    `Browser: ${browser}`,
+    `IP: ${ip}`,
+    `Location: ${location}`,
+  ].join('\n')
+  await sendEmail({
+    to: user.email,
+    from: 'concierge@yashatelier.store',
+    subject: 'Login Successful – YASH',
+    text: body,
+    html: `<p>${body.replace(/\n/g, '<br />')}</p>`,
+  })
+}
+async function createSession(database, userId, token, expiresAt) {
+  await database.collection('sessions').insertOne({ tokenHash: createTokenHash(token), userId, createdAt: new Date(), expiresAt })
+}
 async function getUserFromReq(req) {
   const auth = req.headers.get('authorization') || ''
-  const token = auth.replace('Bearer ', '').trim()
+  const cookieToken = req.cookies.get('yash_auth')?.value || ''
+  const token = auth.replace('Bearer ', '').trim() || cookieToken
   if (!token) return null
+  const verified = verifyJwt(token)
+  if (!verified) return null
   const database = await db()
-  const session = await database.collection('sessions').findOne({ token })
+  const session = await database.collection('sessions').findOne({ tokenHash: createTokenHash(token) })
   if (!session) return null
   if (session.expiresAt && new Date(session.expiresAt) < new Date()) return null
   const user = await database.collection('users').findOne({ id: session.userId })
@@ -178,7 +312,13 @@ async function seedIfNeeded() {
 }
 
 // ---------- Utility ----------
-function json(data, status = 200) { return NextResponse.json(data, { status }) }
+function json(data, status = 200, cookies = {}) {
+  const response = NextResponse.json(data, { status })
+  Object.entries(cookies).forEach(([name, value]) => {
+    if (value) response.cookies.set(name, value, { httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production', path: '/', maxAge: 60 * 60 * 24 * 30 })
+  })
+  return response
+}
 function stripId(doc) {
   if (!doc) return doc
   const { _id, passwordHash, passwordSalt, ...rest } = doc
@@ -203,35 +343,51 @@ async function route(req, method, segments) {
       const { salt, hash } = hashPassword(password)
       const user = { id: uuidv4(), email: email.toLowerCase(), name: name || email.split('@')[0], role: 'customer', passwordSalt: salt, passwordHash: hash, createdAt: new Date() }
       await database.collection('users').insertOne(user)
-      const token = crypto.randomBytes(32).toString('hex')
-      await database.collection('sessions').insertOne({ token, userId: user.id, createdAt: new Date(), expiresAt: new Date(Date.now() + 1000*60*60*24*30) })
-      return json({ token, user: stripId(user) })
+      const token = createJwt({ sub: user.id, role: user.role, email: user.email })
+      const expiresAt = new Date(Date.now() + 1000*60*60*24*30)
+      await createSession(database, user.id, token, expiresAt)
+      return json({ token, user: stripId(user) }, 200, { yash_auth: token })
     }
     if (action === 'login' && method === 'POST') {
       const { email, password } = await parseBody(req)
+      if (!checkLoginRateLimit(req, email)) return json({ error: 'Too many login attempts. Please try again shortly.' }, 429)
       const user = await database.collection('users').findOne({ email: (email||'').toLowerCase() })
       if (!user) return json({ error: 'Invalid credentials' }, 401)
       if (!verifyPassword(password, user.passwordSalt, user.passwordHash)) return json({ error: 'Invalid credentials' }, 401)
-      const token = crypto.randomBytes(32).toString('hex')
-      await database.collection('sessions').insertOne({ token, userId: user.id, createdAt: new Date(), expiresAt: new Date(Date.now() + 1000*60*60*24*30) })
-      return json({ token, user: stripId(user) })
+      const token = createJwt({ sub: user.id, role: user.role, email: user.email })
+      const expiresAt = new Date(Date.now() + 1000*60*60*24*30)
+      await createSession(database, user.id, token, expiresAt)
+      await sendLoginSuccessEmail(stripId(user), req)
+      resetLoginRateLimit(req, email)
+      return json({ token, user: stripId(user) }, 200, { yash_auth: token })
     }
     if (action === 'forgot' && method === 'POST') {
       const { email } = await parseBody(req)
       const user = await database.collection('users').findOne({ email: (email||'').toLowerCase() })
       if (!user) return json({ ok: true, message: 'If the account exists, a reset link has been sent.' })
       const resetToken = crypto.randomBytes(24).toString('hex')
-      await database.collection('resetTokens').insertOne({ token: resetToken, userId: user.id, createdAt: new Date(), expiresAt: new Date(Date.now() + 1000*60*60) })
-      return json({ ok: true, mockedResetToken: resetToken, message: 'Email service is mocked — use the token below.' })
+      const resetTokenHash = createTokenHash(resetToken)
+      const origin = process.env.APP_URL || `https://${req.headers.get('host') || 'localhost:3000'}`
+      const resetUrl = `${origin}/reset?token=${encodeURIComponent(resetToken)}`
+      await database.collection('resetTokens').insertOne({ tokenHash: resetTokenHash, userId: user.id, createdAt: new Date(), expiresAt: new Date(Date.now() + 1000*60*30) })
+      await sendEmail({
+        to: user.email,
+        from: process.env.EMAIL_FROM || 'concierge@yashatelier.store',
+        subject: 'Password reset request – YASH',
+        text: `Hello ${user.name || 'there'},\n\nWe received a request to reset your YASH account password.\nUse the secure link below to continue:\n${resetUrl}\n\nIf you did not request this, you can safely ignore this email.`,
+        html: `<div style="font-family: Arial, sans-serif; line-height: 1.5; color: #1f1f1f;"><h2 style="margin-bottom: 8px;">Reset your YASH password</h2><p>Hello ${user.name || 'there'},</p><p>We received a request to reset your YASH account password.</p><p><a href="${resetUrl}" style="display:inline-block;padding:12px 18px;background:#c8a15b;color:#fff;text-decoration:none;border-radius:4px;">Reset Password</a></p><p>If you did not request this, you can safely ignore this email.</p></div>`,
+      })
+      return json({ ok: true, message: 'A secure password reset email has been sent to your inbox. Please follow the link in the email to continue.' })
     }
     if (action === 'reset' && method === 'POST') {
       const { token: rt, newPassword } = await parseBody(req)
-      const record = await database.collection('resetTokens').findOne({ token: rt })
+      const resetTokenHash = createTokenHash(rt)
+      const record = await database.collection('resetTokens').findOne({ tokenHash: resetTokenHash })
       if (!record) return json({ error: 'Invalid or expired token' }, 400)
       if (new Date(record.expiresAt) < new Date()) return json({ error: 'Token expired' }, 400)
       const { salt, hash } = hashPassword(newPassword)
       await database.collection('users').updateOne({ id: record.userId }, { $set: { passwordSalt: salt, passwordHash: hash } })
-      await database.collection('resetTokens').deleteOne({ token: rt })
+      await database.collection('resetTokens').deleteOne({ tokenHash: resetTokenHash })
       return json({ ok: true })
     }
     if (action === 'me' && method === 'GET') {
@@ -240,8 +396,9 @@ async function route(req, method, segments) {
     }
     if (action === 'logout' && method === 'POST') {
       const auth = req.headers.get('authorization') || ''
-      const token = auth.replace('Bearer ', '').trim()
-      if (token) await database.collection('sessions').deleteOne({ token })
+      const cookieToken = req.cookies.get('yash_auth')?.value || ''
+      const token = auth.replace('Bearer ', '').trim() || cookieToken
+      if (token) await database.collection('sessions').deleteOne({ tokenHash: createTokenHash(token) })
       return json({ ok: true })
     }
   }
@@ -360,6 +517,7 @@ async function route(req, method, segments) {
   if (root === 'orders') {
     const user = await getUserFromReq(req)
     if (method === 'POST' && rest.length === 0) {
+      const authErr = requireAuth(user); if (authErr) return authErr
       const body = await parseBody(req)
       const doc = {
         id: uuidv4(),
@@ -409,6 +567,11 @@ async function route(req, method, segments) {
       await database.collection('orders').updateOne({ id: rest[0] }, update)
       const o = await database.collection('orders').findOne({ id: rest[0] })
       return json({ order: stripId(o) })
+    }
+    if (method === 'DELETE' && rest.length === 1) {
+      const admErr = requireAdmin(user); if (admErr) return admErr
+      await database.collection('orders').deleteOne({ id: rest[0] })
+      return json({ ok: true })
     }
   }
 
