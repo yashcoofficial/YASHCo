@@ -37,6 +37,10 @@ const nextConfig = {
       },
     ];
   },
+  async rewrites() {
+    if (!process.env.API_SERVICE_URL) return [];
+    return [{ source: '/api/:path*', destination: `${process.env.API_SERVICE_URL}/api/:path*` }];
+  },
 };
 
 module.exports = nextConfig;

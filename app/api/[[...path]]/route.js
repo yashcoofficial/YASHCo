@@ -1,9 +1,9 @@
-import { NextResponse } from 'next/server'
+import { NextResponse } from '../../../lib/http-response.js'
 import { MongoClient } from 'mongodb'
 import crypto from 'crypto'
 import nodemailer from 'nodemailer'
 import { v4 as uuidv4 } from 'uuid'
-import { DEFAULT_NAV_ITEMS } from '@/lib/navigation'
+import { DEFAULT_NAV_ITEMS } from '../../../lib/navigation.js'
 
 // ---------- DB ----------
 let clientPromise
@@ -319,6 +319,21 @@ function json(data, status = 200, cookies = {}) {
   })
   return response
 }
+function excelCell(value) {
+  const text = value instanceof Date ? value.toISOString() : String(value ?? '')
+  return `<Cell><Data ss:Type="String">${text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')}</Data></Cell>`
+}
+function excelWorkbook(sheetName, columns, rows) {
+  const header = columns.map(column => excelCell(column.label)).join('')
+  const body = rows.map(row => `<Row>${columns.map(column => excelCell(row[column.key])).join('')}</Row>`).join('')
+  const xml = `<?xml version="1.0"?><Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"><Worksheet ss:Name="${sheetName}"><Table><Row>${header}</Row>${body}</Table></Worksheet></Workbook>`
+  return new Response(xml, {
+    headers: {
+      'Content-Type': 'application/vnd.ms-excel; charset=utf-8',
+      'Content-Disposition': `attachment; filename="yash-${sheetName.toLowerCase()}.xls"`,
+    },
+  })
+}
 function stripId(doc) {
   if (!doc) return doc
   const { _id, passwordHash, passwordSalt, ...rest } = doc
@@ -477,6 +492,46 @@ async function route(req, method, segments) {
     if (method === 'GET' && rest.length === 0) {
       const items = (await database.collection('users').find({ role: { $ne: 'admin' } }).sort({ createdAt: -1 }).toArray()).map(stripId)
       return json({ users: items })
+    }
+  }
+
+  if (root === 'admin' && rest[0] === 'export' && method === 'GET') {
+    const user = await getUserFromReq(req)
+    const admErr = requireAdmin(user); if (admErr) return admErr
+    if (rest[1] === 'clients') {
+      const clients = (await database.collection('users').find({ role: { $ne: 'admin' } }).sort({ createdAt: -1 }).toArray()).map(stripId)
+      return excelWorkbook('clients', [
+        { key: 'id', label: 'Client ID' },
+        { key: 'name', label: 'Name' },
+        { key: 'email', label: 'Email' },
+        { key: 'phone', label: 'Phone' },
+        { key: 'role', label: 'Role' },
+        { key: 'createdAt', label: 'Joined' },
+      ], clients)
+    }
+    if (rest[1] === 'orders') {
+      const orders = (await database.collection('orders').find({}).sort({ createdAt: -1 }).toArray()).map(order => ({
+        ...order,
+        items: JSON.stringify(order.items || []),
+        shippingAddress: JSON.stringify(order.shippingAddress || {}),
+      }))
+      return excelWorkbook('orders', [
+        { key: 'id', label: 'Order ID' },
+        { key: 'orderNumber', label: 'Order Number' },
+        { key: 'userId', label: 'Client ID' },
+        { key: 'customerName', label: 'Customer Name' },
+        { key: 'customerEmail', label: 'Customer Email' },
+        { key: 'customerPhone', label: 'Customer Phone' },
+        { key: 'items', label: 'Items' },
+        { key: 'subtotal', label: 'Subtotal' },
+        { key: 'shipping', label: 'Shipping' },
+        { key: 'total', label: 'Total' },
+        { key: 'shippingAddress', label: 'Shipping Address' },
+        { key: 'status', label: 'Status' },
+        { key: 'paymentStatus', label: 'Payment Status' },
+        { key: 'trackingNumber', label: 'Tracking Number' },
+        { key: 'createdAt', label: 'Created' },
+      ], orders)
     }
   }
 

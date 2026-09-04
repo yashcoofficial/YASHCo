@@ -84,3 +84,25 @@ npm run dev
 http://localhost:3000
 ```
 
+## Multiservice runtime
+
+The application is split into two independently runnable services:
+
+- **Web service**: the Next.js storefront and admin UI on port `3000`.
+- **API service**: the MongoDB-backed REST API on port `4000`.
+
+Run them from two terminals:
+
+```bash
+npm run dev:api
+npm run dev:web
+```
+
+To make the web service send `/api/*` requests to the API service, start the web service with `API_SERVICE_URL`:
+
+```bash
+API_SERVICE_URL=http://localhost:4000 npm run dev:web
+```
+
+Without `API_SERVICE_URL`, Next keeps its built-in API route enabled for backwards-compatible single-process development. Both services use the existing `MONGO_URL`, `DB_NAME`, and authentication/email environment variables.
+

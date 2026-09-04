@@ -17,7 +17,7 @@ import {
   ShoppingBag, Heart, User, Search, Menu, X, ChevronRight, ChevronLeft, Plus, Minus,
   Trash2, LogOut, Edit3, Package, Mail, MessageCircle, Settings as SettingsIcon,
   Truck, Star, Filter, Check, ArrowRight, Instagram, Facebook, Twitter,
-  GripVertical, Eye, EyeOff,
+  GripVertical, Eye, EyeOff, Download,
 } from 'lucide-react'
 import { buildRouteForView, getBoutiqueNavItems, getVisibleNavItems, resolveViewFromPath } from '@/lib/navigation'
 import { validateCheckoutForm } from '@/lib/checkout-utils.mjs'
@@ -30,6 +30,18 @@ const useApp = () => useContext(AppCtx)
 // ---------- Helpers ----------
 const money = (n, sym = '₹') => `${sym}${(n || 0).toLocaleString('en-IN')}`
 const cx = (...a) => a.filter(Boolean).join(' ')
+
+async function downloadAdminExport(path, token) {
+  const response = await fetch(`/api/admin/export/${path}`, { headers: { Authorization: `Bearer ${token}` } })
+  if (!response.ok) throw new Error('Export failed')
+  const blob = await response.blob()
+  const url = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = `yash-${path}.xls`
+  anchor.click()
+  URL.revokeObjectURL(url)
+}
 
 const DEFAULT_SOCIAL_LINKS = [
   { label: 'Instagram', url: 'https://www.instagram.com/', visible: true },
@@ -1815,7 +1827,7 @@ function AdminCollections() {
 }
 
 function AdminOrders() {
-  const { api, settings } = useApp()
+  const { api, settings, token } = useApp()
   const [orders, setOrders] = useState([])
   const [editing, setEditing] = useState(null)
   const reload = () => api('/orders').then(r => setOrders(r.orders || []))
@@ -1830,7 +1842,10 @@ function AdminOrders() {
   }
   return (
     <div>
-      <h3 className="font-serif text-2xl mb-6">All Orders ({orders.length})</h3>
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+        <h3 className="font-serif text-2xl">All Orders ({orders.length})</h3>
+        <Button variant="outline" className="rounded-none tracking-editorial uppercase text-xs" onClick={() => downloadAdminExport('orders', token).catch(e => toast.error(e.message))}><Download className="w-3.5 h-3.5 mr-2" />Export Orders</Button>
+      </div>
       <div className="space-y-2">
         {orders.map(o => (
           <div key={o.id} className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-4 items-center border border-border p-4">
@@ -1874,13 +1889,16 @@ function AdminOrders() {
 }
 
 function AdminClients() {
-  const { api } = useApp()
+  const { api, token } = useApp()
   const [clients, setClients] = useState([])
   const reload = () => api('/users').then(r => setClients(r.users || []))
   useEffect(() => { reload() }, [])
   return (
     <div>
-      <h3 className="font-serif text-2xl mb-6">Clients ({clients.length})</h3>
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+        <h3 className="font-serif text-2xl">Clients ({clients.length})</h3>
+        <Button variant="outline" className="rounded-none tracking-editorial uppercase text-xs" onClick={() => downloadAdminExport('clients', token).catch(e => toast.error(e.message))}><Download className="w-3.5 h-3.5 mr-2" />Export Clients</Button>
+      </div>
       <div className="grid gap-2">
         {clients.map(client => (
           <div key={client.id} className="grid grid-cols-[1.2fr_1.2fr_1fr_auto] gap-4 items-center border border-border p-4">
