@@ -252,9 +252,14 @@ async function seedIfNeeded() {
     })
   }
   const requiredCollections = [
-    { name: 'Womenswear', slug: 'womenswear', image: 'https://images.pexels.com/photos/35596695/pexels-photo-35596695.jpeg', description: 'Softly tailored silhouettes for the modern woman.', order: 1 },
-    { name: 'Menswear', slug: 'menswear', image: 'https://images.pexels.com/photos/28133643/pexels-photo-28133643.jpeg', description: 'Sharply cut suits, quiet knits, considered essentials.', order: 2 },
-    { name: 'Accessories', slug: 'accessories', image: 'https://images.pexels.com/photos/28557819/pexels-photo-28557819.jpeg', description: 'Leather, silk, and metal — the finishing gestures.', order: 3 },
+    { name: 'Womenswear', slug: 'womenswear', image: 'https://images.pexels.com/photos/35596695/pexels-photo-35596695.jpeg', description: 'Softly tailored silhouettes for the modern woman.', order: 1, parentSlug: null },
+    { name: 'Menswear', slug: 'menswear', image: 'https://images.pexels.com/photos/28133643/pexels-photo-28133643.jpeg', description: 'Sharply cut suits, quiet knits, considered essentials.', order: 2, parentSlug: null },
+    { name: 'Accessories', slug: 'accessories', image: 'https://images.pexels.com/photos/28557819/pexels-photo-28557819.jpeg', description: 'Leather, silk, and metal — the finishing gestures.', order: 3, parentSlug: null },
+    { name: 'Shirts', slug: 'menswear-shirts', image: '', description: 'Polished shirts for every considered occasion.', order: 1, parentSlug: 'menswear' },
+    { name: 'Trousers', slug: 'menswear-trousers', image: '', description: 'Tailored trousers with an easy, precise line.', order: 2, parentSlug: 'menswear' },
+    { name: 'T-Shirts', slug: 'menswear-t-shirts', image: '', description: 'Refined everyday jersey essentials.', order: 3, parentSlug: 'menswear' },
+    { name: 'Men', slug: 'accessories-men', image: '', description: 'Finishing pieces for the modern man.', order: 1, parentSlug: 'accessories' },
+    { name: 'Women', slug: 'accessories-women', image: '', description: 'Finishing pieces for the modern woman.', order: 2, parentSlug: 'accessories' },
   ]
 
   for (const collection of requiredCollections) {
@@ -422,7 +427,13 @@ async function route(req, method, segments) {
     if (method === 'GET' && rest.length === 0) {
       const q = new URL(req.url).searchParams
       const filter = {}
-      if (q.get('collection')) filter.collection = q.get('collection')
+      if (q.get('collection')) {
+        const selectedCollection = await database.collection('collections').findOne({ slug: q.get('collection') })
+        const childSlugs = selectedCollection
+          ? (await database.collection('collections').find({ parentSlug: selectedCollection.slug }).toArray()).map(collection => collection.slug)
+          : []
+        filter.collection = { $in: [q.get('collection'), ...childSlugs] }
+      }
       if (q.get('color')) filter.colors = q.get('color')
       if (q.get('size')) filter.sizes = q.get('size')
       if (q.get('minPrice')) filter.price = { ...(filter.price||{}), $gte: parseInt(q.get('minPrice')) }
@@ -453,6 +464,7 @@ async function route(req, method, segments) {
         description: body.description || '',
         collection: body.collection || 'womenswear',
         price: parseInt(body.price)||0,
+        shipping: Math.max(0, parseInt(body.shipping) || 0),
         salePrice: body.salePrice ? parseInt(body.salePrice) : null,
         onSale: !!body.onSale,
         sku: body.sku || `YSH-${Date.now()}`,
@@ -476,6 +488,7 @@ async function route(req, method, segments) {
       if (body.price !== undefined) body.price = parseInt(body.price)
       if (body.salePrice) body.salePrice = parseInt(body.salePrice)
       if (body.stock !== undefined) body.stock = parseInt(body.stock)
+      if (body.shipping !== undefined) body.shipping = Math.max(0, parseInt(body.shipping) || 0)
       await database.collection('products').updateOne({ id: rest[0] }, { $set: body })
       const p = await database.collection('products').findOne({ id: rest[0] })
       return json({ product: stripId(p) })
@@ -544,7 +557,7 @@ async function route(req, method, segments) {
     const admErr = requireAdmin(user); if (admErr) return admErr
     if (method === 'POST') {
       const body = await parseBody(req)
-      const doc = { id: uuidv4(), name: body.name, slug: (body.slug||body.name||'').toLowerCase().replace(/[^a-z0-9]+/g,'-'), image: body.image||'', description: body.description||'', order: parseInt(body.order)||0 }
+      const doc = { id: uuidv4(), name: body.name, slug: (body.slug||body.name||'').toLowerCase().replace(/[^a-z0-9]+/g,'-'), parentSlug: body.parentSlug || null, image: body.image||'', description: body.description||'', order: parseInt(body.order)||0 }
       await database.collection('collections').insertOne(doc)
       return json({ collection: stripId(doc) })
     }
@@ -556,6 +569,8 @@ async function route(req, method, segments) {
       return json({ collection: stripId(c) })
     }
     if (method === 'DELETE' && rest.length === 1) {
+      const collection = await database.collection('collections').findOne({ id: rest[0] })
+      if (collection?.parentSlug) await database.collection('products').updateMany({ collection: collection.slug }, { $set: { collection: collection.parentSlug } })
       await database.collection('collections').deleteOne({ id: rest[0] })
       return json({ ok: true })
     }

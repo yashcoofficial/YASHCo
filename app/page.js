@@ -248,7 +248,7 @@ export default function App() {
       const key = `${product.id}|${size}|${color}`
       const i = prev.findIndex(x => x.key === key)
       if (i >= 0) { const copy = [...prev]; copy[i] = { ...copy[i], qty: copy[i].qty + qty }; return copy }
-      return [...prev, { key, id: product.id, name: product.name, price: product.salePrice || product.price, image: product.images?.[0], size, color, qty }]
+      return [...prev, { key, id: product.id, name: product.name, price: product.salePrice || product.price, shipping: Number(product.shipping) || 0, image: product.images?.[0], size, color, qty }]
     })
     toast.success('Added to bag')
   }
@@ -372,9 +372,18 @@ function Header() {
         <div className="flex items-center gap-6 flex-1">
           <button className="md:hidden" onClick={() => setMenuOpen(true)}><Menu className={cx('w-5 h-5', transparent && 'text-white')} /></button>
           <nav className={cx('hidden md:flex items-center gap-8 text-[11px] tracking-editorial uppercase', transparent && 'text-white')}>
-            {navLinks.map(link => (
-              <button key={`${link.page}-${link.collection || 'main'}`} onClick={() => navigate(link.page, link.collection ? { collection: link.collection } : {})} className="hover:text-accent transition-colors">{link.label}</button>
-            ))}
+            {navLinks.map(link => {
+              const categories = collections.filter(collection => collection.parentSlug === link.collectionSlug).sort((a, b) => (a.order || 0) - (b.order || 0))
+              const hasCategories = link.page === 'shop' && categories.length > 0
+              return (
+                <div key={`${link.page}-${link.collection || 'main'}`} className={cx('relative group h-20 flex items-center', hasCategories && 'cursor-pointer')}>
+                  <button onClick={() => navigate(link.page, link.collection ? { collection: link.collection } : {})} className="hover:text-accent transition-colors">{link.label}</button>
+                  {hasCategories && <div className="absolute left-0 top-full z-50 min-w-48 border border-border bg-background p-2 normal-case opacity-0 invisible translate-y-1 group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 group-focus-within:opacity-100 group-focus-within:visible group-focus-within:translate-y-0 transition-all duration-150 shadow-sm">
+                    {categories.map(category => <button key={category.id} onClick={() => navigate('shop', { collection: category.slug })} className="block w-full px-3 py-2 text-left text-[11px] tracking-editorial uppercase hover:bg-muted hover:text-accent transition-colors">{category.name}</button>)}
+                  </div>}
+                </div>
+              )
+            })}
           </nav>
         </div>
         <button onClick={() => navigate('home')} className="flex items-center justify-center">
@@ -405,7 +414,12 @@ function MobileMenu() {
         <SheetHeader><SheetTitle className="font-serif text-2xl">Menu</SheetTitle></SheetHeader>
         <div className="mt-8 flex flex-col gap-5 text-sm tracking-editorial uppercase">
           {navLinks.map(link => (
-            <button key={`${link.page}-${link.collection || 'main'}`} onClick={() => navigate(link.page, link.collection ? { collection: link.collection } : {})} className="text-left border-b border-border pb-3">{link.label}</button>
+            <div key={`${link.page}-${link.collection || 'main'}`} className="border-b border-border pb-3">
+              <button onClick={() => { setMenuOpen(false); navigate(link.page, link.collection ? { collection: link.collection } : {}) }} className="text-left">{link.label}</button>
+              {link.collectionSlug && collections.filter(collection => collection.parentSlug === link.collectionSlug).sort((a, b) => (a.order || 0) - (b.order || 0)).map(category => (
+                <button key={category.id} onClick={() => { setMenuOpen(false); navigate('shop', { collection: category.slug }) }} className="block ml-3 mt-3 text-left text-xs text-muted-foreground">{category.name}</button>
+              ))}
+            </div>
           ))}
           <button onClick={() => navigate(user ? (user.role === 'admin' ? 'admin' : 'dashboard') : 'login')} className="text-left border-b border-border pb-3">{user ? 'Account' : 'Sign In'}</button>
         </div>
@@ -417,6 +431,7 @@ function MobileMenu() {
 function CartDrawer() {
   const { cartOpen, setCartOpen, cart, updateQty, removeFromCart, navigate, settings, requestCheckoutAccess } = useApp()
   const subtotal = cart.reduce((s, x) => s + x.price * x.qty, 0)
+  const shipping = cart.reduce((sum, item) => sum + (Number(item.shipping) || 0) * item.qty, 0)
   return (
     <Sheet open={cartOpen} onOpenChange={setCartOpen}>
       <SheetContent side="right" className="w-[92vw] sm:w-[440px] bg-background flex flex-col">
@@ -454,7 +469,8 @@ function CartDrawer() {
             </div>
             <div className="border-t border-border pt-4 space-y-4">
               <div className="flex justify-between text-sm"><span className="tracking-editorial uppercase text-xs">Subtotal</span><span>{money(subtotal, settings.currencySymbol)}</span></div>
-              <div className="text-xs text-muted-foreground">Shipping & taxes calculated at checkout.</div>
+              <div className="flex justify-between text-sm"><span className="tracking-editorial uppercase text-xs">Shipping</span><span className={shipping === 0 ? 'text-accent tracking-editorial text-xs' : ''}>{shipping === 0 ? 'COMPLIMENTARY SHIPPING' : money(shipping, settings.currencySymbol)}</span></div>
+              <div className="flex justify-between font-serif text-lg pt-3 border-t border-border"><span>Total</span><span>{money(subtotal + shipping, settings.currencySymbol)}</span></div>
               <Button className="w-full rounded-none h-12 tracking-editorial uppercase text-xs" onClick={() => { setCartOpen(false); requestCheckoutAccess() }}>Proceed to Checkout</Button>
             </div>
           </>}
@@ -497,7 +513,7 @@ function HomeView() {
       const collection = collections.find((c) => c.slug === link.collectionSlug)
       return collection ? { ...collection, navLabel: link.label, navFooterLabel: link.footerLabel } : null
     })
-    .filter(Boolean)
+    .filter((collection) => collection && !collection.parentSlug)
 
   const renderSection = (id) => {
     switch (id) {
@@ -788,6 +804,13 @@ function ShopView() {
   const [products, setProducts] = useState([])
   const [filters, setFilters] = useState({ collection: view.params.collection || '', size: '', color: '', minPrice: '', maxPrice: '', search: '', sort: '' })
   const [loading, setLoading] = useState(true)
+  const activeCollection = collections.find(collection => collection.slug === filters.collection)
+  const activeCollectionSlugs = activeCollection
+    ? [activeCollection.slug, ...collections.filter(collection => collection.parentSlug === activeCollection.slug).map(collection => collection.slug)]
+    : []
+  const scopedProducts = activeCollection
+    ? allProducts.filter(product => activeCollectionSlugs.includes(product.collection))
+    : allProducts
 
   useEffect(() => {
     setFilters(prev => ({ ...prev, collection: view.params.collection || '' }))
@@ -799,9 +822,6 @@ function ShopView() {
     Object.entries(filters).forEach(([k, v]) => v && q.append(k, v))
     api(`/products?${q.toString()}`).then(r => setProducts(r.products)).finally(() => setLoading(false))
   }, [filters, api])
-
-  const allSizes = [...new Set(allProducts.flatMap(p => p.sizes || []))]
-  const collectionColors = [...new Set(allProducts.filter(p => !filters.collection || p.collection === filters.collection).flatMap(p => p.colors || []))]
 
   const pageKey = 'shop'
   let pageSections = settings.pageLayouts?.[pageKey]?.sections || []
@@ -817,45 +837,18 @@ function ShopView() {
         if (s.type === 'core-shop') {
           return (
             <div key={s.id} className="max-w-[1400px] mx-auto px-4 md:px-8 py-12 md:py-20">
-              <div className="text-center mb-12 fade-in">
+              <div className="text-center mb-8 fade-in">
                 <div className="text-[11px] tracking-luxe uppercase text-accent mb-4">{s.content?.eyebrow || 'The Boutique'}</div>
-                <h1 className="font-serif text-5xl md:text-6xl">{s.content?.title || (filters.collection ? collections.find(c => c.slug === filters.collection)?.name || 'Shop' : 'Shop All')}</h1>
+                <h1 className="font-serif text-5xl md:text-6xl uppercase">{activeCollection?.name || s.content?.title || 'Shop All'}</h1>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-[240px_1fr] gap-8 md:gap-12">
-                <aside className="space-y-8">
-                  <div>
-                    <Label className="text-[11px] tracking-editorial uppercase text-muted-foreground">Search</Label>
-                    <Input value={filters.search} onChange={e => setFilters(f => ({ ...f, search: e.target.value }))} placeholder="Search pieces..." className="mt-2 rounded-none" />
-                  </div>
-                  <div>
-                    <Label className="text-[11px] tracking-editorial uppercase text-muted-foreground">Collection</Label>
-                    <div className="mt-3 space-y-2">
-                      <button onClick={() => navigate('shop')} className={cx('block text-sm', !filters.collection && 'text-accent')}>All</button>
-                      {collections.map(c => <button key={c.id} onClick={() => navigate('shop', { collection: c.slug })} className={cx('block text-sm', filters.collection === c.slug && 'text-accent')}>{c.name}</button>)}
-                    </div>
-                  </div>
-                  <div>
-                    <Label className="text-[11px] tracking-editorial uppercase text-muted-foreground">Size</Label>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {allSizes.map(s => <button key={s} onClick={() => setFilters(f => ({ ...f, size: f.size === s ? '' : s }))} className={cx('px-3 py-1 border text-xs', filters.size === s ? 'border-primary bg-primary text-primary-foreground' : 'border-border')}>{s}</button>)}
-                    </div>
-                  </div>
-                  <div>
-                    <Label className="text-[11px] tracking-editorial uppercase text-muted-foreground">Colour</Label>
-                    <div className="mt-3 space-y-1">
-                      {collectionColors.map(c => <button key={c} onClick={() => setFilters(f => ({ ...f, color: f.color === c ? '' : c }))} className={cx('flex items-center gap-2 text-sm', filters.color === c && 'text-accent')}><span className="inline-block w-3 h-3 rounded-full border border-border" style={{ background: colorHex(c) }} />{c}</button>)}
-                      {collectionColors.length === 0 && <span className="text-xs text-muted-foreground">No colours</span>}
-                    </div>
-                  </div>
-                  <div>
-                    <Label className="text-[11px] tracking-editorial uppercase text-muted-foreground">Price (₹)</Label>
-                    <div className="mt-3 flex gap-2">
-                      <Input placeholder="Min" value={filters.minPrice} onChange={e => setFilters(f => ({ ...f, minPrice: e.target.value }))} className="rounded-none" />
-                      <Input placeholder="Max" value={filters.maxPrice} onChange={e => setFilters(f => ({ ...f, maxPrice: e.target.value }))} className="rounded-none" />
-                    </div>
-                  </div>
-                  <button onClick={() => setFilters({ collection: '', size: '', color: '', minPrice: '', maxPrice: '', search: '', sort: '' })} className="text-xs tracking-editorial uppercase underline">Clear filters</button>
-                </aside>
+              <div className="max-w-xl mx-auto mb-12">
+                <Label className="sr-only" htmlFor="shop-search">Search pieces</Label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input id="shop-search" value={filters.search} onChange={e => setFilters(f => ({ ...f, search: e.target.value }))} placeholder="Search pieces..." className="h-12 rounded-none pl-10 text-center" />
+                </div>
+              </div>
+              <div>
                 <div>
                   <div className="flex items-center justify-between mb-6">
                     <div className="text-xs text-muted-foreground">{loading ? 'Loading...' : `${products.length} pieces`}</div>
@@ -885,7 +878,7 @@ function ShopView() {
 
 // ---------- Product Detail ----------
 function ProductView() {
-  const { api, view, settings, addToCart, toggleWishlist, wishlist, navigate } = useApp()
+  const { api, view, settings, collections, addToCart, toggleWishlist, wishlist, navigate } = useApp()
   const [product, setProduct] = useState(null)
   const [size, setSize] = useState('')
   const [color, setColor] = useState('')
@@ -897,11 +890,14 @@ function ProductView() {
   if (!product) return <div className="py-32 text-center text-muted-foreground">Loading...</div>
   const inWish = wishlist.includes(product.id)
   const stockStatusText = getStockStatusText(product)
+  const productCollection = collections.find(collection => collection.slug === product.collection)
+  const parentCollection = productCollection?.parentSlug ? collections.find(collection => collection.slug === productCollection.parentSlug) : null
+  const collectionTrail = [parentCollection?.name, productCollection?.name || product.collection].filter(Boolean).join(', ')
 
   return (
     <div className="max-w-[1400px] mx-auto px-4 md:px-8 py-8 md:py-16">
       <div className="text-xs text-muted-foreground mb-6 tracking-editorial uppercase">
-        <button onClick={() => navigate('shop')}>Shop</button> <ChevronRight className="inline w-3 h-3" /> {product.collection}
+        <button onClick={() => navigate('shop')}>Shop</button> <ChevronRight className="inline w-3 h-3" /> <span className="uppercase">{collectionTrail}</span>
       </div>
       <div className="grid md:grid-cols-2 gap-8 md:gap-16">
         <div>
@@ -919,7 +915,7 @@ function ProductView() {
           )}
         </div>
         <div className="md:sticky md:top-28 h-fit">
-          <div className="text-[11px] tracking-luxe uppercase text-accent mb-3">{product.collection}</div>
+          <div className="text-[11px] tracking-luxe uppercase text-accent mb-3">{collectionTrail}</div>
           <h1 className="font-serif text-4xl md:text-5xl">{product.name}</h1>
           <div className="mt-4 text-lg">
             {product.salePrice ? <><span className="text-accent">{money(product.salePrice, settings.currencySymbol)}</span> <span className="line-through text-muted-foreground ml-2">{money(product.price, settings.currencySymbol)}</span></> : money(product.price, settings.currencySymbol)}
@@ -970,7 +966,7 @@ function ProductView() {
               <p className="text-sm">{product.care}</p>
             </div>
             <div className="flex gap-6 text-xs tracking-editorial uppercase text-muted-foreground">
-              <div className="flex items-center gap-2"><Truck className="w-3.5 h-3.5" /> Complimentary Shipping</div>
+              <div className="flex items-center gap-2"><Truck className="w-3.5 h-3.5" /> {Number(product.shipping) > 0 ? `Shipping ${money(Number(product.shipping), settings.currencySymbol)}` : 'COMPLIMENTARY SHIPPING'}</div>
               <div className="flex items-center gap-2"><Package className="w-3.5 h-3.5" /> SKU: {product.sku}</div>
             </div>
           </div>
@@ -1012,6 +1008,7 @@ function InquiryDialog({ open, onOpenChange, productId, productName }) {
 function CartView() {
   const { cart, updateQty, removeFromCart, navigate, settings, requestCheckoutAccess } = useApp()
   const subtotal = cart.reduce((s, x) => s + x.price * x.qty, 0)
+  const shipping = cart.reduce((sum, item) => sum + (Number(item.shipping) || 0) * item.qty, 0)
   return (
     <div className="max-w-4xl mx-auto px-4 md:px-8 py-16">
       <h1 className="font-serif text-5xl mb-10 text-center">Your Bag</h1>
@@ -1041,7 +1038,8 @@ function CartView() {
           <div className="mt-12 flex justify-end">
             <div className="w-full md:w-96 space-y-4">
               <div className="flex justify-between"><span className="tracking-editorial uppercase text-xs">Subtotal</span><span>{money(subtotal, settings.currencySymbol)}</span></div>
-              <div className="text-xs text-muted-foreground">Complimentary shipping applied.</div>
+              <div className="flex justify-between"><span className="tracking-editorial uppercase text-xs">Shipping</span><span className={shipping === 0 ? 'text-accent tracking-editorial text-xs' : ''}>{shipping === 0 ? 'COMPLIMENTARY SHIPPING' : money(shipping, settings.currencySymbol)}</span></div>
+              <div className="flex justify-between font-serif text-lg pt-3 border-t border-border"><span>Total</span><span>{money(subtotal + shipping, settings.currencySymbol)}</span></div>
               <Button className="w-full rounded-none h-12 tracking-editorial uppercase text-xs" onClick={() => requestCheckoutAccess()}>Proceed to Checkout</Button>
             </div>
           </div>
@@ -1060,7 +1058,8 @@ function CheckoutView() {
   const [submitting, setSubmitting] = useState(false)
   const [submitAttempted, setSubmitAttempted] = useState(false)
   const subtotal = cart.reduce((s, x) => s + x.price * x.qty, 0)
-  const total = subtotal
+  const shipping = cart.reduce((sum, item) => sum + (Number(item.shipping) || 0) * item.qty, 0)
+  const total = subtotal + shipping
   const validation = useMemo(() => validateCheckoutForm(form), [form])
   const errors = submitAttempted ? validation.errors : {}
 
@@ -1085,7 +1084,7 @@ function CheckoutView() {
       const r = await api('/orders', {
         method: 'POST', body: {
           customerName: form.customerName, customerEmail: form.customerEmail, customerPhone: form.customerPhone,
-          items: cart, subtotal, shipping: 0, total,
+          items: cart, subtotal, shipping, total,
           shippingAddress: { line1: form.line1, line2: form.line2, city: form.city, state: form.state, pincode: form.pincode, country: form.country },
           notes: form.notes,
         }
@@ -1161,7 +1160,7 @@ function CheckoutView() {
           </div>
           <div className="pt-6 space-y-2 text-sm">
             <div className="flex justify-between"><span>Subtotal</span><span>{money(subtotal, settings.currencySymbol)}</span></div>
-            <div className="flex justify-between"><span>Shipping</span><span className="text-accent">Complimentary</span></div>
+            <div className="flex justify-between"><span>Shipping</span><span className={shipping === 0 ? 'text-accent tracking-editorial text-xs' : ''}>{shipping === 0 ? 'COMPLIMENTARY SHIPPING' : money(shipping, settings.currencySymbol)}</span></div>
             <div className="flex justify-between font-serif text-lg pt-3 border-t border-border"><span>Total</span><span>{money(total, settings.currencySymbol)}</span></div>
           </div>
           <div className="mt-6 text-xs text-muted-foreground bg-background/70 p-4 border border-border">
@@ -1700,7 +1699,7 @@ function AdminProducts() {
   const [editing, setEditing] = useState(null)
   const reload = () => api('/products').then(r => setProducts(r.products))
   useEffect(() => { reload() }, [])
-  const empty = { name: '', description: '', collection: 'womenswear', price: 0, salePrice: '', onSale: false, sku: '', stock: 0, images: [''], sizes: ['XS', 'S', 'M', 'L', 'XL'], colors: ['Noir', 'Ivory', 'Champagne'], material: '', care: '', sizeGuide: '', featured: false, lowStockThreshold: 3 }
+  const empty = { name: '', description: '', collection: 'womenswear', price: 0, salePrice: '', shipping: 0, onSale: false, sku: '', stock: 0, images: [''], sizes: ['XS', 'S', 'M', 'L', 'XL'], colors: ['Noir', 'Ivory', 'Champagne'], material: '', care: '', sizeGuide: '', featured: false, lowStockThreshold: 3 }
   const save = async () => {
     try {
       const body = { ...editing, images: editing.images.filter(Boolean) }
@@ -1744,13 +1743,21 @@ function AdminProducts() {
             <Input placeholder="Name" className="rounded-none" value={editing.name} onChange={e => setEditing({ ...editing, name: e.target.value })} />
             <Textarea placeholder="Description" rows={3} className="rounded-none" value={editing.description} onChange={e => setEditing({ ...editing, description: e.target.value })} />
             <div className="grid grid-cols-2 gap-3">
-              <Select value={editing.collection} onValueChange={v => setEditing({ ...editing, collection: v })}>
-                <SelectTrigger className="rounded-none"><SelectValue /></SelectTrigger>
-                <SelectContent>{collections.map(c => <SelectItem key={c.id} value={c.slug}>{c.name}</SelectItem>)}</SelectContent>
+              <Select value={collections.find(c => c.slug === editing.collection)?.parentSlug || editing.collection} onValueChange={v => setEditing({ ...editing, collection: v })}>
+                <SelectTrigger className="rounded-none"><SelectValue placeholder="Collection" /></SelectTrigger>
+                <SelectContent>{collections.filter(c => !c.parentSlug).map(c => <SelectItem key={c.id} value={c.slug}>{c.name}</SelectItem>)}</SelectContent>
+              </Select>
+              <Select value={collections.find(c => c.slug === editing.collection)?.parentSlug ? editing.collection : '__none__'} onValueChange={v => setEditing({ ...editing, collection: v === '__none__' ? collections.find(c => c.slug === editing.collection)?.parentSlug || editing.collection : v })}>
+                <SelectTrigger className="rounded-none"><SelectValue placeholder="Category (optional)" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">All products in collection</SelectItem>
+                  {collections.filter(c => c.parentSlug === (collections.find(parent => parent.slug === editing.collection)?.parentSlug || editing.collection)).map(c => <SelectItem key={c.id} value={c.slug}>{c.name}</SelectItem>)}
+                </SelectContent>
               </Select>
               <Input placeholder="SKU" className="rounded-none" value={editing.sku} onChange={e => setEditing({ ...editing, sku: e.target.value })} />
               <Input type="number" placeholder="Price (₹)" className="rounded-none" value={editing.price} onChange={e => setEditing({ ...editing, price: e.target.value })} />
               <Input type="number" placeholder="Sale Price (optional)" className="rounded-none" value={editing.salePrice || ''} onChange={e => setEditing({ ...editing, salePrice: e.target.value })} />
+              <Input type="number" min="0" placeholder="Shipping charge (₹)" className="rounded-none" value={editing.shipping ?? 0} onChange={e => setEditing({ ...editing, shipping: e.target.value })} />
               <Input type="number" placeholder="Stock" className="rounded-none" value={editing.stock} onChange={e => setEditing({ ...editing, stock: e.target.value })} />
               <Input type="number" placeholder="Low stock threshold" className="rounded-none" value={editing.lowStockThreshold} onChange={e => setEditing({ ...editing, lowStockThreshold: e.target.value })} />
             </div>
@@ -1783,6 +1790,7 @@ function AdminProducts() {
 
 function AdminCollections() {
   const { api, collections, setCollections } = useApp()
+  const topLevelCollections = collections.filter(collection => !collection.parentSlug)
   const [editing, setEditing] = useState(null)
   const reload = () => api('/collections').then(r => setCollections(r.collections))
   const save = async () => {
@@ -1795,13 +1803,19 @@ function AdminCollections() {
   const remove = async (id) => { if (!confirm('Delete?')) return; await api(`/collections/${id}`, { method: 'DELETE' }); reload() }
   return (
     <div>
-      <div className="flex justify-between mb-6"><h3 className="font-serif text-2xl">Collections</h3><Button className="rounded-none tracking-editorial uppercase text-xs" onClick={() => setEditing({ name: '', slug: '', image: '', description: '', order: collections.length + 1 })}><Plus className="w-3.5 h-3.5 mr-2" />New</Button></div>
+      <div className="flex justify-between mb-6"><h3 className="font-serif text-2xl">Collections & Categories</h3><Button className="rounded-none tracking-editorial uppercase text-xs" onClick={() => setEditing({ name: '', slug: '', image: '', description: '', order: topLevelCollections.length + 1, parentSlug: null })}><Plus className="w-3.5 h-3.5 mr-2" />New Collection</Button></div>
       <div className="grid md:grid-cols-3 gap-4">
-        {collections.map(c => (
+        {topLevelCollections.map(c => (
           <div key={c.id} className="border border-border p-4">
             <img src={c.image} className="w-full aspect-video object-cover mb-3" />
             <div className="font-serif text-xl">{c.name}</div>
             <div className="text-xs text-muted-foreground">{c.slug}</div>
+            <div className="mt-4 border-t border-border pt-3">
+              <div className="flex items-center justify-between mb-2"><span className="text-[11px] tracking-editorial uppercase text-muted-foreground">Categories</span><Button size="sm" variant="outline" className="rounded-none h-7 text-[10px]" onClick={() => setEditing({ name: '', slug: '', parentSlug: c.slug, image: '', description: '', order: collections.filter(child => child.parentSlug === c.slug).length + 1 })}><Plus className="w-3 h-3 mr-1" />Add</Button></div>
+              <div className="space-y-1">
+                {collections.filter(child => child.parentSlug === c.slug).sort((a, b) => (a.order || 0) - (b.order || 0)).map(child => <div key={child.id} className="flex items-center justify-between text-sm"><span>{child.name}</span><Button size="sm" variant="ghost" className="h-7 px-2 text-destructive" onClick={() => remove(child.id)}><Trash2 className="w-3 h-3" /></Button></div>)}
+              </div>
+            </div>
             <div className="flex gap-2 mt-3">
               <Button size="sm" variant="outline" className="rounded-none" onClick={() => setEditing(c)}>Edit</Button>
               <Button size="sm" variant="outline" className="rounded-none" onClick={() => remove(c.id)}>Delete</Button>
@@ -1815,6 +1829,7 @@ function AdminCollections() {
           {editing && <div className="space-y-3">
             <Input placeholder="Name" className="rounded-none" value={editing.name} onChange={e => setEditing({ ...editing, name: e.target.value })} />
             <Input placeholder="Slug" className="rounded-none" value={editing.slug} onChange={e => setEditing({ ...editing, slug: e.target.value })} />
+            {editing.parentSlug && <div className="text-xs text-muted-foreground">Category of {topLevelCollections.find(collection => collection.slug === editing.parentSlug)?.name || editing.parentSlug}</div>}
             <Input placeholder="Image URL" className="rounded-none" value={editing.image} onChange={e => setEditing({ ...editing, image: e.target.value })} />
             <Textarea placeholder="Description" className="rounded-none" value={editing.description} onChange={e => setEditing({ ...editing, description: e.target.value })} />
             <Input type="number" placeholder="Order" className="rounded-none" value={editing.order} onChange={e => setEditing({ ...editing, order: e.target.value })} />
