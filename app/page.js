@@ -14,7 +14,7 @@ import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { Switch } from '@/components/ui/switch'
 import {
-  ShoppingBag, Heart, User, Search, Menu, X, ChevronRight, ChevronLeft, Plus, Minus,
+  ShoppingBag, Heart, User, Search, Menu, X, ChevronRight, ChevronLeft, ChevronDown, Plus, Minus,
   Trash2, LogOut, Edit3, Package, Mail, MessageCircle, Settings as SettingsIcon,
   Truck, Star, Filter, Check, ArrowRight, Instagram, Facebook, Twitter,
   GripVertical, Eye, EyeOff, Download,
@@ -99,6 +99,7 @@ export default function App() {
   const [cartOpen, setCartOpen] = useState(false)
   const [authModalOpen, setAuthModalOpen] = useState(false)
   const [pendingCheckout, setPendingCheckout] = useState(false)
+  const [feedbackOpen, setFeedbackOpen] = useState(false)
   const [transparentLogo, setTransparentLogo] = useState(null)
   const [allProducts, setAllProducts] = useState([])
 
@@ -267,7 +268,7 @@ export default function App() {
     api('/wishlist').then(r => setWishlist(r.productIds || [])).catch(() => { })
   }, [user, api])
 
-  const ctxValue = { view, navigate, user, token, setAuth, settings, setSettings, collections, setCollections, cart, addToCart, updateQty, removeFromCart, clearCart, wishlist, toggleWishlist, api, cartOpen, setCartOpen, menuOpen, setMenuOpen, transparentLogo, allProducts, setAllProducts, authModalOpen, setAuthModalOpen, pendingCheckout, setPendingCheckout, requestCheckoutAccess }
+  const ctxValue = { view, navigate, user, token, setAuth, settings, setSettings, collections, setCollections, cart, addToCart, updateQty, removeFromCart, clearCart, wishlist, toggleWishlist, api, cartOpen, setCartOpen, menuOpen, setMenuOpen, transparentLogo, allProducts, setAllProducts, authModalOpen, setAuthModalOpen, pendingCheckout, setPendingCheckout, requestCheckoutAccess, feedbackOpen, setFeedbackOpen }
 
   if (!settings) return <div className="min-h-screen flex items-center justify-center bg-background"><Loader /></div>
 
@@ -275,6 +276,7 @@ export default function App() {
     <AppCtx.Provider value={ctxValue}>
       <Toaster position="top-center" toastOptions={{ className: 'font-sans text-sm' }} />
       <AuthGateModal />
+      <FeedbackDialog />
       <AnnouncementBar />
       <Header />
       <CartDrawer />
@@ -344,6 +346,57 @@ function AuthGateModal() {
   )
 }
 
+function FeedbackDialog() {
+  const { api, user, feedbackOpen, setFeedbackOpen } = useApp()
+  const [form, setForm] = useState({ name: '', email: '', message: '' })
+  const [submitting, setSubmitting] = useState(false)
+
+  useEffect(() => {
+    if (feedbackOpen) setForm(prev => ({ ...prev, name: user?.name || prev.name, email: user?.email || prev.email }))
+  }, [feedbackOpen, user])
+
+  const submit = async (event) => {
+    event.preventDefault()
+    if (!form.name || !form.email || !form.message) {
+      toast.error('Please share your name, email, and thoughts.')
+      return
+    }
+    setSubmitting(true)
+    try {
+      await api('/inquiries', { method: 'POST', body: { ...form, phone: 'Not provided', subject: 'Website Feedback' } })
+      toast.success('Thank you. Your perspective will help shape YASH.')
+      setFeedbackOpen(false)
+      setForm({ name: user?.name || '', email: user?.email || '', message: '' })
+    } catch (error) {
+      toast.error(error.message)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <Dialog open={feedbackOpen} onOpenChange={setFeedbackOpen}>
+      <DialogContent className="rounded-none max-w-lg">
+        <DialogHeader>
+          <div className="text-[10px] tracking-luxe uppercase text-accent mb-2">A note to the house</div>
+          <DialogTitle className="font-serif text-3xl">Your perspective matters.</DialogTitle>
+          <p className="text-sm text-muted-foreground leading-relaxed pt-2">YASH is shaped with our community. Tell us what felt considered, what could feel better, or what you would love to see next. We read every note.</p>
+        </DialogHeader>
+        <form onSubmit={submit} className="space-y-4 mt-2">
+          <div className="grid sm:grid-cols-2 gap-4">
+            <Input required placeholder="Your name" className="rounded-none h-12" value={form.name} onChange={event => setForm({ ...form, name: event.target.value })} />
+            <Input required type="email" placeholder="Email address" className="rounded-none h-12" value={form.email} onChange={event => setForm({ ...form, email: event.target.value })} />
+          </div>
+          <Textarea required rows={5} placeholder="What would you like us to know?" className="rounded-none resize-none" value={form.message} onChange={event => setForm({ ...form, message: event.target.value })} />
+          <DialogFooter>
+            <Button type="submit" disabled={submitting} className="w-full rounded-none h-12 tracking-editorial uppercase text-xs">{submitting ? 'Sending…' : 'Share my feedback'}</Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 // ---------- Header ----------
 function AnnouncementBar() {
   const { settings } = useApp()
@@ -407,20 +460,43 @@ function Header() {
 
 function MobileMenu() {
   const { menuOpen, setMenuOpen, navigate, user, settings, collections } = useApp()
+  const [expandedCollections, setExpandedCollections] = useState([])
   const navLinks = getVisibleNavItems(settings?.headerNavLinks, collections)
+
+  useEffect(() => {
+    if (!menuOpen) setExpandedCollections([])
+  }, [menuOpen])
+
   return (
     <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
       <SheetContent side="left" className="w-[85vw] sm:w-[380px] bg-background">
         <SheetHeader><SheetTitle className="font-serif text-2xl">Menu</SheetTitle></SheetHeader>
         <div className="mt-8 flex flex-col gap-5 text-sm tracking-editorial uppercase">
-          {navLinks.map(link => (
-            <div key={`${link.page}-${link.collection || 'main'}`} className="border-b border-border pb-3">
-              <button onClick={() => { setMenuOpen(false); navigate(link.page, link.collection ? { collection: link.collection } : {}) }} className="text-left">{link.label}</button>
-              {link.collectionSlug && collections.filter(collection => collection.parentSlug === link.collectionSlug).sort((a, b) => (a.order || 0) - (b.order || 0)).map(category => (
-                <button key={category.id} onClick={() => { setMenuOpen(false); navigate('shop', { collection: category.slug }) }} className="block ml-3 mt-3 text-left text-xs text-muted-foreground">{category.name}</button>
-              ))}
-            </div>
-          ))}
+          {navLinks.map(link => {
+            const categories = collections.filter(collection => collection.parentSlug === link.collectionSlug).sort((a, b) => (a.order || 0) - (b.order || 0))
+            const hasCategories = link.page === 'shop' && categories.length > 0
+            const isExpanded = expandedCollections.includes(link.collectionSlug)
+            return (
+              <div key={`${link.page}-${link.collection || 'main'}`} className="border-b border-border pb-3">
+                {hasCategories
+                  ? <button
+                    aria-expanded={isExpanded}
+                    onClick={() => setExpandedCollections(current => isExpanded ? current.filter(slug => slug !== link.collectionSlug) : [...current, link.collectionSlug])}
+                    className="w-full flex items-center justify-between text-left"
+                  >
+                    <span>{link.label}</span>
+                    <ChevronDown className={cx('w-4 h-4 transition-transform', isExpanded && 'rotate-180')} />
+                  </button>
+                  : <button onClick={() => { setMenuOpen(false); navigate(link.page, link.collection ? { collection: link.collection } : {}) }} className="text-left">{link.label}</button>}
+                {hasCategories && isExpanded && (
+                  <div className="mt-3 ml-3 space-y-3 border-l border-border pl-4 normal-case">
+                    <button onClick={() => { setMenuOpen(false); navigate('shop', { collection: link.collectionSlug }) }} className="block text-left text-xs text-accent uppercase">View all {link.label}</button>
+                    {categories.map(category => <button key={category.id} onClick={() => { setMenuOpen(false); navigate('shop', { collection: category.slug }) }} className="block text-left text-xs text-muted-foreground">{category.name}</button>)}
+                  </div>
+                )}
+              </div>
+            )
+          })}
           <button onClick={() => navigate(user ? (user.role === 'admin' ? 'admin' : 'dashboard') : 'login')} className="text-left border-b border-border pb-3">{user ? 'Account' : 'Sign In'}</button>
         </div>
       </SheetContent>
@@ -483,7 +559,7 @@ function CartDrawer() {
 const DEFAULT_HOME_ORDER = ['hero', 'collections', 'featured', 'lookbook', 'about', 'concierge-cta']
 
 function HomeView() {
-  const { settings, collections, navigate, api } = useApp()
+  const { settings, collections, navigate, api, setFeedbackOpen } = useApp()
   const [featured, setFeatured] = useState([])
   useEffect(() => { api('/products?featured=true').then(r => setFeatured(r.products.slice(0, 4))).catch(() => { }) }, [api])
 
@@ -637,6 +713,14 @@ function HomeView() {
   return (
     <div>
       {sectionOrder.map(id => vis[id] === false ? null : renderSection(id))}
+      <section className="border-t border-border py-20 md:py-28 px-6">
+        <div className="max-w-2xl mx-auto text-center">
+          <div className="text-[11px] tracking-luxe uppercase text-accent mb-4">Your voice, at the heart of the house</div>
+          <h2 className="font-serif text-4xl md:text-5xl mb-5">Help us shape what comes next.</h2>
+          <p className="text-muted-foreground leading-relaxed mb-8">Every thoughtful note helps us refine the YASH experience and create a brand that feels more meaningful to you.</p>
+          <Button variant="outline" onClick={() => setFeedbackOpen(true)} className="rounded-none h-12 px-8 tracking-editorial uppercase text-xs">Share your feedback</Button>
+        </div>
+      </section>
     </div>
   )
 }
@@ -1174,7 +1258,8 @@ function CheckoutView() {
 }
 
 function OrderSuccessView() {
-  const { view, navigate } = useApp()
+  const { view, navigate, setFeedbackOpen } = useApp()
+  useEffect(() => { setFeedbackOpen(true) }, [setFeedbackOpen])
   return (
     <div className="max-w-2xl mx-auto text-center py-32 px-6">
       <div className="w-16 h-16 mx-auto rounded-full border border-accent flex items-center justify-center mb-8"><Check className="w-6 h-6 text-accent" /></div>
