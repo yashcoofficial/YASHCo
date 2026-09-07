@@ -556,7 +556,7 @@ function CartDrawer() {
 }
 
 // ---------- Home ----------
-const DEFAULT_HOME_ORDER = ['hero', 'collections', 'featured', 'lookbook', 'about', 'concierge-cta']
+const DEFAULT_HOME_ORDER = ['hero', 'collections', 'featured', 'lookbook', 'about', 'concierge-cta', 'feedback']
 
 function HomeView() {
   const { settings, collections, navigate, api, setFeedbackOpen } = useApp()
@@ -706,6 +706,16 @@ function HomeView() {
           <Button onClick={() => navigate('concierge')} variant="outline" className={cx('rounded-none tracking-editorial uppercase text-xs h-12 px-10', conBg === 'dark' ? 'border-primary-foreground/30 text-primary-foreground' : 'border-primary')}>{settings.conciergeCtaLabel || 'Request a Consultation'}</Button>
         </section>
       )
+      case 'feedback': return (
+        <section key="feedback" className="border-t border-border py-20 md:py-28 px-6">
+          <div className="max-w-2xl mx-auto text-center">
+            <div className="text-[11px] tracking-luxe uppercase text-accent mb-4">{settings.feedbackEyebrow || 'Your voice, at the heart of the house'}</div>
+            <h2 className="font-serif text-4xl md:text-5xl mb-5">{settings.feedbackTitle || 'Help us shape what comes next.'}</h2>
+            <p className="text-muted-foreground leading-relaxed mb-8">{settings.feedbackBody || 'Every thoughtful note helps us refine the YASH experience and create a brand that feels more meaningful to you.'}</p>
+            <Button variant="outline" onClick={() => setFeedbackOpen(true)} className="rounded-none h-12 px-8 tracking-editorial uppercase text-xs">{settings.feedbackCtaLabel || 'Share your feedback'}</Button>
+          </div>
+        </section>
+      )
       default: return null
     }
   }
@@ -713,14 +723,6 @@ function HomeView() {
   return (
     <div>
       {sectionOrder.map(id => vis[id] === false ? null : renderSection(id))}
-      <section className="border-t border-border py-20 md:py-28 px-6">
-        <div className="max-w-2xl mx-auto text-center">
-          <div className="text-[11px] tracking-luxe uppercase text-accent mb-4">Your voice, at the heart of the house</div>
-          <h2 className="font-serif text-4xl md:text-5xl mb-5">Help us shape what comes next.</h2>
-          <p className="text-muted-foreground leading-relaxed mb-8">Every thoughtful note helps us refine the YASH experience and create a brand that feels more meaningful to you.</p>
-          <Button variant="outline" onClick={() => setFeedbackOpen(true)} className="rounded-none h-12 px-8 tracking-editorial uppercase text-xs">Share your feedback</Button>
-        </div>
-      </section>
     </div>
   )
 }
@@ -2422,6 +2424,23 @@ const HOME_SECTION_DEFS = [
         </div>
       )
     }
+  },
+  {
+    id: 'feedback', label: 'Feedback Invitation', accent: '#6b7280',
+    fields: [
+      { key: 'feedbackEyebrow', label: 'Eyebrow Label', type: 'text', placeholder: 'Your voice, at the heart of the house' },
+      { key: 'feedbackTitle', label: 'Headline', type: 'text', placeholder: 'Help us shape what comes next.' },
+      { key: 'feedbackBody', label: 'Body Text', type: 'textarea', placeholder: 'Every thoughtful note helps us refine the YASH experience…' },
+      { key: 'feedbackCtaLabel', label: 'Button Label', type: 'text', placeholder: 'Share your feedback' },
+    ],
+    preview: (s) => (
+      <div style={{ borderTop: '1px solid #d8d0c4', padding: '20px 16px', textAlign: 'center' }}>
+        <div style={{ fontSize: '8px', color: '#c8a15b', letterSpacing: '0.3em', textTransform: 'uppercase', marginBottom: '6px' }}>{s.feedbackEyebrow || 'Your voice, at the heart of the house'}</div>
+        <div style={{ fontFamily: 'Georgia,serif', fontSize: '15px', marginBottom: '6px' }}>{s.feedbackTitle || 'Help us shape what comes next.'}</div>
+        <div style={{ color: '#6b7280', fontSize: '8px', lineHeight: 1.5, margin: '0 auto 10px', maxWidth: '240px' }}>{s.feedbackBody || 'Every thoughtful note helps us refine the YASH experience.'}</div>
+        <div style={{ display: 'inline-block', border: '1px solid #141414', fontSize: '7px', letterSpacing: '0.15em', textTransform: 'uppercase', padding: '5px 14px' }}>{s.feedbackCtaLabel || 'Share your feedback'}</div>
+      </div>
+    )
   },
 ]
 
