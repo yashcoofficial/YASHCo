@@ -363,7 +363,7 @@ function FeedbackDialog() {
     }
     setSubmitting(true)
     try {
-      await api('/inquiries', { method: 'POST', body: { ...form, phone: 'Not provided', subject: 'Website Feedback' } })
+      await api('/feedback', { method: 'POST', body: form })
       toast.success('Thank you. Your perspective will help shape YASH.')
       setFeedbackOpen(false)
       setForm({ name: user?.name || '', email: user?.email || '', message: '' })
@@ -581,7 +581,8 @@ function HomeView() {
   const aboutPad = settings.aboutPadding || 'md'
   const conBg = settings.conciergeCtaBg || 'light'
 
-  const sectionOrder = settings.homeSectionOrder || DEFAULT_HOME_ORDER
+  const savedSectionOrder = Array.isArray(settings.homeSectionOrder) ? settings.homeSectionOrder : DEFAULT_HOME_ORDER
+  const sectionOrder = savedSectionOrder.includes('feedback') ? savedSectionOrder : [...savedSectionOrder, 'feedback']
   const vis = settings.homeSectionVisibility || {}
   const visibleCollectionLinks = getBoutiqueNavItems(settings?.headerNavLinks, collections).filter((item) => item.collectionSlug)
   const collectionItems = visibleCollectionLinks
@@ -1727,7 +1728,7 @@ function AdminView() {
       </div>
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList className="bg-transparent border-b border-border w-full justify-start rounded-none h-auto p-0 flex-wrap">
-          {['overview', 'products', 'collections', 'orders', 'clients', 'inquiries', 'settings', 'page-studio'].map(t => (
+          {['overview', 'products', 'collections', 'orders', 'clients', 'inquiries', 'feedback', 'settings', 'page-studio'].map(t => (
             <TabsTrigger key={t} value={t} className="rounded-none data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-accent tracking-editorial uppercase text-xs px-6 py-3">{t === 'page-studio' ? 'Page Studio' : t}</TabsTrigger>
           ))}
         </TabsList>
@@ -1737,6 +1738,7 @@ function AdminView() {
         <TabsContent value="orders" className="pt-8"><AdminOrders /></TabsContent>
         <TabsContent value="clients" className="pt-8"><AdminClients /></TabsContent>
         <TabsContent value="inquiries" className="pt-8"><AdminInquiries /></TabsContent>
+        <TabsContent value="feedback" className="pt-8"><AdminFeedback /></TabsContent>
         <TabsContent value="settings" className="pt-8"><AdminSettings /></TabsContent>
         <TabsContent value="page-studio" className="pt-8"><AdminPageStudio /></TabsContent>
       </Tabs>
@@ -2023,7 +2025,7 @@ function AdminInquiries() {
   const { api } = useApp()
   const [items, setItems] = useState([])
   const [editing, setEditing] = useState(null)
-  const reload = () => api('/inquiries').then(r => setItems(r.inquiries || []))
+  const reload = () => api('/inquiries').then(r => setItems((r.inquiries || []).filter(item => item.subject !== 'Website Feedback')))
   useEffect(() => { reload() }, [])
   const save = async () => {
     try { await api(`/inquiries/${editing.id}`, { method: 'PUT', body: { status: editing.status, response: editing.response } }); toast.success('Updated'); setEditing(null); reload() } catch (e) { toast.error(e.message) }
@@ -2065,6 +2067,38 @@ function AdminInquiries() {
           <DialogFooter><Button className="rounded-none" onClick={save}>Save</Button></DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  )
+}
+
+function AdminFeedback() {
+  const { api } = useApp()
+  const [items, setItems] = useState([])
+  const reload = () => api('/feedback').then(r => setItems(r.feedback || []))
+  useEffect(() => { reload() }, [])
+  const remove = async (id) => {
+    if (!confirm('Delete this feedback?')) return
+    try { await api(`/feedback/${id}`, { method: 'DELETE' }); reload() } catch (e) { toast.error(e.message) }
+  }
+  return (
+    <div>
+      <h3 className="font-serif text-2xl mb-2">Client Feedback ({items.length})</h3>
+      <p className="text-sm text-muted-foreground mb-6">Thoughts shared by clients to help shape the YASH experience.</p>
+      <div className="space-y-2">
+        {items.map(item => (
+          <div key={item.id} className="border border-border p-5">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="font-serif text-lg">{item.name}</div>
+                <div className="text-xs text-muted-foreground">{item.email} · {new Date(item.createdAt).toLocaleString()}</div>
+                <p className="text-sm mt-3 whitespace-pre-wrap">{item.message}</p>
+              </div>
+              <Button size="sm" variant="outline" className="rounded-none" onClick={() => remove(item.id)}><Trash2 className="w-3.5 h-3.5" /></Button>
+            </div>
+          </div>
+        ))}
+        {items.length === 0 && <div className="text-muted-foreground text-sm py-12 text-center">No feedback yet.</div>}
+      </div>
     </div>
   )
 }

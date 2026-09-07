@@ -669,10 +669,10 @@ async function route(req, method, segments) {
     if (method === 'GET') {
       if (!user) return json({ error: 'Unauthorized' }, 401)
       if (user.role === 'admin') {
-        const items = (await database.collection('inquiries').find({}).sort({ createdAt: -1 }).toArray()).map(stripId)
+        const items = (await database.collection('inquiries').find({ subject: { $ne: 'Website Feedback' } }).sort({ createdAt: -1 }).toArray()).map(stripId)
         return json({ inquiries: items })
       }
-      const items = (await database.collection('inquiries').find({ userId: user.id }).sort({ createdAt: -1 }).toArray()).map(stripId)
+      const items = (await database.collection('inquiries').find({ userId: user.id, subject: { $ne: 'Website Feedback' } }).sort({ createdAt: -1 }).toArray()).map(stripId)
       return json({ inquiries: items })
     }
     if (method === 'PUT' && rest.length === 1) {
@@ -684,6 +684,27 @@ async function route(req, method, segments) {
     }
     if (method === 'DELETE' && rest.length === 1) {
       await database.collection('inquiries').deleteOne({ id: rest[0] })
+      return json({ ok: true })
+    }
+  }
+
+  if (root === 'feedback') {
+    if (method === 'POST' && rest.length === 0) {
+      const user = await getUserFromReq(req)
+      const body = await parseBody(req)
+      if (!body.name || !body.email || !body.message) return json({ error: 'name, email and message are required' }, 400)
+      const doc = { id: uuidv4(), userId: user?.id || null, name: body.name, email: body.email, message: body.message, status: 'New', createdAt: new Date() }
+      await database.collection('feedback').insertOne(doc)
+      return json({ feedback: stripId(doc) })
+    }
+    const user = await getUserFromReq(req)
+    const authErr = requireAdmin(user); if (authErr) return authErr
+    if (method === 'GET' && rest.length === 0) {
+      const items = (await database.collection('feedback').find({}).sort({ createdAt: -1 }).toArray()).map(stripId)
+      return json({ feedback: items })
+    }
+    if (method === 'DELETE' && rest.length === 1) {
+      await database.collection('feedback').deleteOne({ id: rest[0] })
       return json({ ok: true })
     }
   }
