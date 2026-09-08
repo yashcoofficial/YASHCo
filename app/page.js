@@ -17,7 +17,7 @@ import {
   ShoppingBag, Heart, User, Search, Menu, X, ChevronRight, ChevronLeft, ChevronDown, Plus, Minus,
   Trash2, LogOut, Edit3, Package, Mail, MessageCircle, Settings as SettingsIcon,
   Truck, Star, Filter, Check, ArrowRight, Instagram, Facebook, Twitter,
-  GripVertical, Eye, EyeOff, Download,
+  GripVertical, Eye, EyeOff, Download, ZoomIn,
 } from 'lucide-react'
 import { buildRouteForView, getBoutiqueNavItems, getVisibleNavItems, resolveViewFromPath } from '@/lib/navigation'
 import { validateCheckoutForm } from '@/lib/checkout-utils.mjs'
@@ -734,8 +734,8 @@ function ProductCard({ p, overrideImage, aspectRatio }) {
   const stockStatusText = getStockStatusText(p)
   return (
     <div className="group cursor-pointer" onClick={() => navigate('product', { id: p.id })}>
-      <div className="img-zoom bg-muted relative overflow-hidden" style={{ aspectRatio: aspectRatio || '3/4' }}>
-        <img src={overrideImage || p.images?.[0]} alt={p.name} className="w-full h-full object-cover" />
+      <div className="bg-muted relative overflow-hidden" style={{ aspectRatio: aspectRatio || '3/4' }}>
+        <img src={overrideImage || p.images?.[0]} alt={p.name} className="w-full h-full object-contain" />
         <button onClick={(e) => { e.stopPropagation(); toggleWishlist(p.id) }} className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/90 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
           <Heart className={cx('w-3.5 h-3.5', inWish ? 'fill-accent text-accent' : 'text-foreground')} />
         </button>
@@ -971,6 +971,7 @@ function ProductView() {
   const [color, setColor] = useState('')
   const [activeImg, setActiveImg] = useState(0)
   const [inquiryOpen, setInquiryOpen] = useState(false)
+  const [imageOpen, setImageOpen] = useState(false)
 
   useEffect(() => { api(`/products/${view.params.id}`).then(r => { setProduct(r.product); setSize(r.product.sizes?.[0] || ''); setColor(r.product.colors?.[0] || '') }) }, [view.params.id, api])
 
@@ -988,14 +989,21 @@ function ProductView() {
       </div>
       <div className="grid md:grid-cols-2 gap-8 md:gap-16">
         <div>
-          <div className="aspect-[3/4] bg-muted overflow-hidden">
-            <img src={product.images?.[activeImg]} alt={product.name} className="w-full h-full object-cover" />
-          </div>
+          <button
+            type="button"
+            onClick={() => setImageOpen(true)}
+            className="group relative block w-full aspect-[3/4] bg-muted overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            aria-label={`View larger image of ${product.name}`}>
+            <img src={product.images?.[activeImg]} alt={product.name} className="w-full h-full object-contain" />
+            <span className="absolute bottom-3 right-3 inline-flex items-center gap-2 bg-background/90 px-3 py-2 text-[10px] tracking-editorial uppercase opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
+              <ZoomIn className="h-3.5 w-3.5" /> View image
+            </span>
+          </button>
           {product.images?.length > 1 && (
             <div className="grid grid-cols-4 gap-2 mt-2">
               {product.images.map((im, i) => (
                 <button key={i} onClick={() => setActiveImg(i)} className={cx('aspect-[3/4] overflow-hidden', activeImg === i ? 'ring-2 ring-accent' : '')}>
-                  <img src={im} className="w-full h-full object-cover" />
+                  <img src={im} alt={`${product.name} view ${i + 1}`} className="w-full h-full object-contain" />
                 </button>
               ))}
             </div>
@@ -1060,8 +1068,23 @@ function ProductView() {
         </div>
       </div>
 
+      <ProductImageDialog open={imageOpen} onOpenChange={setImageOpen} image={product.images?.[activeImg]} productName={product.name} />
       <InquiryDialog open={inquiryOpen} onOpenChange={setInquiryOpen} productId={product.id} productName={product.name} />
     </div>
+  )
+}
+
+function ProductImageDialog({ open, onOpenChange, image, productName }) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-6xl border-none bg-black/95 p-3 text-white sm:p-6">
+        <DialogTitle className="sr-only">{productName} product image</DialogTitle>
+        <div className="flex min-h-[50vh] items-center justify-center">
+          <img src={image} alt={productName} className="max-h-[80vh] w-auto max-w-full object-contain" />
+        </div>
+        <p className="text-center text-sm text-white/80">{productName}</p>
+      </DialogContent>
+    </Dialog>
   )
 }
 
