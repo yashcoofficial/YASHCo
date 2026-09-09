@@ -19,8 +19,8 @@ export const metadata = {
   title: 'YASH — Own Every Moment',
   description: 'YASH Maison — A curated house of quiet luxury. Own Every Moment.',
   icons: {
-    icon: [{ url: '/icon.svg', type: 'image/svg+xml', sizes: 'any' }],
-    shortcut: '/icon.svg',
+    icon: [{ url: '/YASH.png', type: 'image/png', sizes: '512x512' }],
+    shortcut: '/YASH.png',
   },
 }
 

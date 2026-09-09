@@ -964,6 +964,13 @@ function ShopView() {
 }
 
 // ---------- Product Detail ----------
+const BRAND_SIZE_CHART = [
+  { size: 'S', chest: '40', length: '27.5', shoulder: '17.5', waist: '38' },
+  { size: 'M', chest: '42', length: '28', shoulder: '18', waist: '40' },
+  { size: 'L', chest: '43', length: '28.5', shoulder: '18.5', waist: '42' },
+  { size: 'XL', chest: '47', length: '29', shoulder: '19', waist: '45' },
+]
+
 function ProductView() {
   const { api, view, settings, collections, addToCart, toggleWishlist, wishlist, navigate } = useApp()
   const [product, setProduct] = useState(null)
@@ -1030,7 +1037,36 @@ function ProductView() {
 
           <div className="mt-6 rounded-none border border-border p-4">
             <div className="text-[11px] tracking-editorial uppercase text-muted-foreground mb-3">Size Guide</div>
-            <p className="text-sm whitespace-pre-wrap">{product.sizeGuide || 'Please contact our concierge for bespoke fit guidance and sizing support.'}</p>
+            <p className="text-xs text-muted-foreground mb-3">All measurements are in inches.</p>
+            {product.sizeGuideImage ? (
+              <img src={product.sizeGuideImage} alt="Size chart with measurements in inches" className="w-full h-auto object-contain" />
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[480px] text-sm">
+                  <thead>
+                    <tr className="border-b border-border text-left text-[11px] tracking-editorial uppercase text-muted-foreground">
+                      <th className="pb-2 pr-4 font-normal">Size</th>
+                      <th className="pb-2 pr-4 font-normal">Chest</th>
+                      <th className="pb-2 pr-4 font-normal">Length</th>
+                      <th className="pb-2 pr-4 font-normal">Shoulder</th>
+                      <th className="pb-2 font-normal">Waist</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {BRAND_SIZE_CHART.map(measurement => (
+                      <tr key={measurement.size} className="border-b border-border last:border-0">
+                        <td className="py-3 pr-4 font-medium">{measurement.size}</td>
+                        <td className="py-3 pr-4">{measurement.chest}</td>
+                        <td className="py-3 pr-4">{measurement.length}</td>
+                        <td className="py-3 pr-4">{measurement.shoulder}</td>
+                        <td className="py-3">{measurement.waist}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            {product.sizeGuide && <p className="text-sm whitespace-pre-wrap mt-4 pt-4 border-t border-border">{product.sizeGuide}</p>}
           </div>
           <div className="mt-6">
             <Label className="text-[11px] tracking-editorial uppercase text-muted-foreground">Colour: {color}</Label>
@@ -1811,7 +1847,7 @@ function AdminProducts() {
   const [editing, setEditing] = useState(null)
   const reload = () => api('/products').then(r => setProducts(r.products))
   useEffect(() => { reload() }, [])
-  const empty = { name: '', description: '', collection: 'womenswear', price: 0, salePrice: '', shipping: 0, onSale: false, sku: '', stock: 0, images: [''], sizes: ['XS', 'S', 'M', 'L', 'XL'], colors: ['Noir', 'Ivory', 'Champagne'], material: '', care: '', sizeGuide: '', featured: false, lowStockThreshold: 3 }
+  const empty = { name: '', description: '', collection: 'womenswear', price: 0, salePrice: '', shipping: 0, onSale: false, sku: '', stock: 0, images: [''], sizes: ['S', 'M', 'L', 'XL'], colors: ['Noir', 'Ivory', 'Champagne'], material: '', care: '', sizeGuide: '', sizeGuideImage: '', featured: false, lowStockThreshold: 3 }
   const save = async () => {
     try {
       const body = { ...editing, images: editing.images.filter(Boolean) }
@@ -1888,6 +1924,33 @@ function AdminProducts() {
             <Textarea placeholder="Material & Craft" rows={2} className="rounded-none" value={editing.material} onChange={e => setEditing({ ...editing, material: e.target.value })} />
             <Textarea placeholder="Care instructions" rows={2} className="rounded-none" value={editing.care} onChange={e => setEditing({ ...editing, care: e.target.value })} />
             <Textarea placeholder="Size guide for customers" rows={4} className="rounded-none" value={editing.sizeGuide || ''} onChange={e => setEditing({ ...editing, sizeGuide: e.target.value })} />
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-3">
+                <Label>Size chart image</Label>
+                {editing.sizeGuideImage && <Button type="button" variant="ghost" size="sm" className="rounded-none text-xs" onClick={() => setEditing({ ...editing, sizeGuideImage: '' })}>Remove</Button>}
+              </div>
+              <Input type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="rounded-none" onChange={e => {
+                const file = e.target.files?.[0]
+                if (!file) return
+                if (!file.type.startsWith('image/')) {
+                  toast.error('Please choose an image file')
+                  e.target.value = ''
+                  return
+                }
+                if (file.size > 5 * 1024 * 1024) {
+                  toast.error('Size chart image must be 5 MB or smaller')
+                  e.target.value = ''
+                  return
+                }
+                const reader = new FileReader()
+                reader.onload = () => setEditing(current => ({ ...current, sizeGuideImage: String(reader.result) }))
+                reader.onerror = () => toast.error('Could not read the size chart image')
+                reader.readAsDataURL(file)
+              }} />
+              <p className="text-xs text-muted-foreground">PNG, JPG, WEBP, or GIF up to 5 MB. The chart is saved with this product.</p>
+              <Input placeholder="Or paste size chart image URL" className="rounded-none" value={editing.sizeGuideImage?.startsWith('data:') ? '' : editing.sizeGuideImage || ''} onChange={e => setEditing({ ...editing, sizeGuideImage: e.target.value })} />
+              {editing.sizeGuideImage && <img src={editing.sizeGuideImage} alt="Size chart preview" className="max-h-40 w-auto border border-border object-contain" />}
+            </div>
             <div className="flex gap-6">
               <label className="flex items-center gap-2 text-sm"><Switch checked={editing.featured} onCheckedChange={v => setEditing({ ...editing, featured: v })} /> Featured</label>
               <label className="flex items-center gap-2 text-sm"><Switch checked={editing.onSale} onCheckedChange={v => setEditing({ ...editing, onSale: v })} /> On Sale</label>
