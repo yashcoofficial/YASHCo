@@ -617,7 +617,7 @@ function HomeView() {
               heroSize === 'md' && 'text-3xl sm:text-4xl md:text-6xl lg:text-7xl',
               heroSize === 'sm' && 'text-3xl sm:text-4xl md:text-5xl lg:text-6xl',
             )}>{settings.heroTitle}</h1>
-            <p className="hero-subtitle text-white/85 mt-4 sm:mt-6 max-w-[min(100%,36rem)] text-sm md:text-base leading-relaxed">{settings.heroSubtitle}</p>
+            <p className="hero-subtitle whitespace-pre-line text-white/85 mt-4 sm:mt-6 max-w-[min(100%,36rem)] text-sm md:text-base leading-relaxed">{settings.heroSubtitle}</p>
             <Button onClick={() => navigate('shop')} className="hero-cta mt-8 sm:mt-10 rounded-none bg-white text-black hover:bg-white/90 h-12 px-6 sm:px-10 tracking-editorial uppercase text-xs max-w-full whitespace-nowrap">{settings.heroCtaLabel || 'Discover the Collection'}</Button>
           </div>
         </section>
@@ -695,7 +695,7 @@ function HomeView() {
             <div className="text-[11px] tracking-luxe uppercase text-accent mb-6">{settings.aboutEyebrow || 'Maison'}</div>
             <h2 className="font-serif text-4xl md:text-5xl mb-8">{settings.aboutTitle}</h2>
             <div className="divider-gold mx-auto w-32 mb-8" />
-            <p className={cx('leading-relaxed', aboutBg === 'dark' ? 'text-primary-foreground/80' : 'text-muted-foreground')}>{settings.aboutBody}</p>
+            <p className={cx('whitespace-pre-line leading-relaxed', aboutBg === 'dark' ? 'text-primary-foreground/80' : 'text-muted-foreground')}>{settings.aboutBody}</p>
           </div>
         </section>
       )
@@ -703,7 +703,7 @@ function HomeView() {
         <section key="concierge-cta" className={cx('py-24 max-w-3xl mx-auto text-center px-6', conBg === 'dark' && 'bg-primary text-primary-foreground')}>
           <div className="text-[11px] tracking-luxe uppercase text-accent mb-4">{settings.concierge?.title || 'Concierge'}</div>
           <h2 className="font-serif text-4xl md:text-5xl mb-4">{settings.conciergeHomeCta || 'Bespoke, on request.'}</h2>
-          <p className={cx('mb-8', conBg === 'dark' ? 'text-primary-foreground/70' : 'text-muted-foreground')}>{settings.concierge?.subtitle}</p>
+          <p className={cx('whitespace-pre-line mb-8', conBg === 'dark' ? 'text-primary-foreground/70' : 'text-muted-foreground')}>{settings.concierge?.subtitle}</p>
           <Button onClick={() => navigate('concierge')} variant="outline" className={cx('rounded-none tracking-editorial uppercase text-xs h-12 px-10', conBg === 'dark' ? 'border-primary-foreground/30 text-primary-foreground' : 'border-primary')}>{settings.conciergeCtaLabel || 'Request a Consultation'}</Button>
         </section>
       )
@@ -712,7 +712,7 @@ function HomeView() {
           <div className="max-w-2xl mx-auto text-center">
             <div className="text-[11px] tracking-luxe uppercase text-accent mb-4">{settings.feedbackEyebrow || 'Your voice, at the heart of the house'}</div>
             <h2 className="font-serif text-4xl md:text-5xl mb-5">{settings.feedbackTitle || 'Help us shape what comes next.'}</h2>
-            <p className="text-muted-foreground leading-relaxed mb-8">{settings.feedbackBody || 'Every thoughtful note helps us refine the YASH experience and create a brand that feels more meaningful to you.'}</p>
+            <p className="whitespace-pre-line text-muted-foreground leading-relaxed mb-8">{settings.feedbackBody || 'Every thoughtful note helps us refine the YASH experience and create a brand that feels more meaningful to you.'}</p>
             <Button variant="outline" onClick={() => setFeedbackOpen(true)} className="rounded-none h-12 px-8 tracking-editorial uppercase text-xs">{settings.feedbackCtaLabel || 'Share your feedback'}</Button>
           </div>
         </section>
@@ -796,7 +796,7 @@ function PageSection({ section }) {
       <div className="text-center mb-12">
         <div className="text-[11px] tracking-luxe uppercase text-accent mb-4">Private Concierge</div>
         <h1 className="font-serif text-5xl">{section.content?.title || 'Concierge'}</h1>
-        <p className="text-muted-foreground mt-4">{section.content?.subtitle || 'Private booking inquiry form'}</p>
+        <p className="whitespace-pre-line text-muted-foreground mt-4">{section.content?.subtitle || 'Private booking inquiry form'}</p>
       </div>
       <div className="space-y-4 opacity-60">
         <div className="h-12 bg-muted w-full" />
@@ -824,7 +824,7 @@ function HeroBannerSection({ section }) {
       {content.image && <img src={content.image} alt="" className="absolute inset-0 w-full h-full object-cover" />}
       {content.image && <div className="absolute inset-0" style={{ background: `rgba(0,0,0,${opacity})` }} />}
       <div className={cx('relative z-10 h-full flex flex-col justify-end pb-16 px-8', align === 'center' && 'items-center text-center', align === 'left' && 'items-start', align === 'right' && 'items-end')}>
-        {content.subtitle && <div className="text-white/80 text-[11px] tracking-luxe uppercase mb-4">{content.subtitle}</div>}
+        {content.subtitle && <div className="whitespace-pre-line text-white/80 text-[11px] tracking-luxe uppercase mb-4">{content.subtitle}</div>}
         {content.title && <h2 className="font-serif text-white text-5xl md:text-7xl font-light leading-tight">{content.title}</h2>}
         {content.ctaLabel && (
           <button onClick={() => content.ctaAction && navigate(content.ctaAction)} className="mt-8 rounded-none bg-white text-black hover:bg-white/90 h-12 px-10 tracking-editorial uppercase text-xs">{content.ctaLabel}</button>
@@ -843,7 +843,7 @@ function EditorialTextSection({ section }) {
         {content.label && <div className="text-[11px] tracking-luxe uppercase text-accent mb-4">{content.label}</div>}
         {content.title && <h2 className="font-serif text-4xl md:text-5xl mb-6">{content.title}</h2>}
         {content.title && <div className="divider-gold mx-auto w-32 mb-8" />}
-        {content.body && <p className="text-muted-foreground leading-relaxed text-base">{content.body}</p>}
+        {content.body && <p className="whitespace-pre-line text-muted-foreground leading-relaxed text-base">{content.body}</p>}
       </div>
     </section>
   )
@@ -873,7 +873,7 @@ function PromoBannerSection({ section }) {
   return (
     <section className={cx('py-16 px-6 text-center', dark ? 'bg-primary text-primary-foreground' : 'bg-muted/40')}>
       <div className="max-w-2xl mx-auto">
-        {content.text && <p className={cx('font-serif text-3xl md:text-4xl mb-6', dark && 'text-primary-foreground')}>{content.text}</p>}
+        {content.text && <p className={cx('whitespace-pre-line font-serif text-3xl md:text-4xl mb-6', dark && 'text-primary-foreground')}>{content.text}</p>}
         {content.ctaLabel && (
           <button onClick={() => content.ctaAction && navigate(content.ctaAction)}
             className={cx('rounded-none h-12 px-10 tracking-editorial uppercase text-xs border', dark ? 'border-primary-foreground text-primary-foreground hover:bg-primary-foreground hover:text-primary' : 'border-primary text-primary hover:bg-primary hover:text-primary-foreground', 'transition-colors')}>
@@ -1485,7 +1485,7 @@ function ConciergeView() {
               <div className="text-center mb-12">
                 <div className="text-[11px] tracking-luxe uppercase text-accent mb-4">Private Concierge</div>
                 <h1 className="font-serif text-5xl">{s.content?.title || settings.concierge?.title || 'Concierge'}</h1>
-                <p className="text-muted-foreground mt-4">{s.content?.subtitle || settings.concierge?.subtitle}</p>
+                <p className="whitespace-pre-line text-muted-foreground mt-4">{s.content?.subtitle || settings.concierge?.subtitle}</p>
               </div>
               <div className="grid md:grid-cols-2 gap-8 mb-12 text-sm">
                 <div className="border border-border p-6">
@@ -1523,7 +1523,7 @@ function AboutView() {
       <div className="text-[11px] tracking-luxe uppercase text-accent mb-6">Maison</div>
       <h1 className="font-serif text-5xl mb-6">{settings.aboutTitle}</h1>
       <div className="divider-gold mx-auto w-32 mb-8" />
-      <p className="text-muted-foreground leading-relaxed">{settings.aboutBody}</p>
+      <p className="whitespace-pre-line text-muted-foreground leading-relaxed">{settings.aboutBody}</p>
     </div>
   )
 }
