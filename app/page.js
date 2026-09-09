@@ -735,7 +735,7 @@ function ProductCard({ p, overrideImage, aspectRatio }) {
   return (
     <div className="group cursor-pointer" onClick={() => navigate('product', { id: p.id })}>
       <div className="bg-muted relative overflow-hidden" style={{ aspectRatio: aspectRatio || '3/4' }}>
-        <img src={overrideImage || p.images?.[0]} alt={p.name} className="w-full h-full object-contain" />
+        <img src={overrideImage || p.images?.[0]} alt={p.name} className="w-full h-full object-cover" />
         <button onClick={(e) => { e.stopPropagation(); toggleWishlist(p.id) }} className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/90 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
           <Heart className={cx('w-3.5 h-3.5', inWish ? 'fill-accent text-accent' : 'text-foreground')} />
         </button>
@@ -994,7 +994,7 @@ function ProductView() {
             onClick={() => setImageOpen(true)}
             className="group relative block w-full aspect-[3/4] bg-muted overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             aria-label={`View larger image of ${product.name}`}>
-            <img src={product.images?.[activeImg]} alt={product.name} className="w-full h-full object-contain" />
+            <img src={product.images?.[activeImg]} alt={product.name} className="w-full h-full object-cover" />
             <span className="absolute bottom-3 right-3 inline-flex items-center gap-2 bg-background/90 px-3 py-2 text-[10px] tracking-editorial uppercase opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
               <ZoomIn className="h-3.5 w-3.5" /> View image
             </span>
@@ -1003,7 +1003,7 @@ function ProductView() {
             <div className="grid grid-cols-4 gap-2 mt-2">
               {product.images.map((im, i) => (
                 <button key={i} onClick={() => setActiveImg(i)} className={cx('aspect-[3/4] overflow-hidden', activeImg === i ? 'ring-2 ring-accent' : '')}>
-                  <img src={im} alt={`${product.name} view ${i + 1}`} className="w-full h-full object-contain" />
+                  <img src={im} alt={`${product.name} view ${i + 1}`} className="w-full h-full object-cover" />
                 </button>
               ))}
             </div>
