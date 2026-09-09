@@ -641,7 +641,7 @@ function HomeView() {
                     <h3 className="font-serif text-2xl">{c.name}</h3>
                     <span className="text-[11px] tracking-editorial uppercase group-hover:text-accent transition-colors">Explore →</span>
                   </div>
-                  <p className="text-sm text-muted-foreground mt-1">{c.description}</p>
+                  <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap">{c.description}</p>
                 </button>
               ))}
             </div>
@@ -1016,7 +1016,7 @@ function ProductView() {
             {product.salePrice ? <><span className="text-accent">{money(product.salePrice, settings.currencySymbol)}</span> <span className="line-through text-muted-foreground ml-2">{money(product.price, settings.currencySymbol)}</span></> : money(product.price, settings.currencySymbol)}
           </div>
           {stockStatusText && <div className="mt-3 inline-flex items-center rounded-none border border-destructive/30 bg-destructive/10 px-3 py-2 text-[11px] tracking-editorial uppercase text-destructive">{stockStatusText}</div>}
-          <p className="text-muted-foreground mt-6 leading-relaxed">{product.description}</p>
+          <p className="text-muted-foreground mt-6 leading-relaxed whitespace-pre-wrap">{product.description}</p>
 
           <div className="mt-8">
             <div className="flex items-center justify-between mb-3">
@@ -1054,11 +1054,11 @@ function ProductView() {
           <div className="mt-10 space-y-6 border-t border-border pt-8">
             <div>
               <div className="text-[11px] tracking-editorial uppercase text-muted-foreground mb-2">Material & Craft</div>
-              <p className="text-sm">{product.material}</p>
+              <p className="text-sm whitespace-pre-wrap">{product.material}</p>
             </div>
             <div>
               <div className="text-[11px] tracking-editorial uppercase text-muted-foreground mb-2">Care</div>
-              <p className="text-sm">{product.care}</p>
+              <p className="text-sm whitespace-pre-wrap">{product.care}</p>
             </div>
             <div className="flex gap-6 text-xs tracking-editorial uppercase text-muted-foreground">
               <div className="flex items-center gap-2"><Truck className="w-3.5 h-3.5" /> {Number(product.shipping) > 0 ? `Shipping ${money(Number(product.shipping), settings.currencySymbol)}` : 'COMPLIMENTARY SHIPPING'}</div>
