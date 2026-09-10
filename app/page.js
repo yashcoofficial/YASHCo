@@ -64,6 +64,12 @@ function socialIconFor(label = '') {
   return MessageCircle
 }
 
+function getSizeGuideImage(product) {
+  const candidates = [product?.sizeGuideImage, product?.sizeChartImage, product?.sizeChartUrl]
+  const image = candidates.find(value => typeof value === 'string' && value.trim())
+  return image?.trim() || ''
+}
+
 // Map friendly colour names to CSS colours for swatch previews
 function colorHex(name) {
   const map = {
@@ -979,10 +985,13 @@ function ProductView() {
   const [activeImg, setActiveImg] = useState(0)
   const [inquiryOpen, setInquiryOpen] = useState(false)
   const [imageOpen, setImageOpen] = useState(false)
+  const [sizeGuideImageFailed, setSizeGuideImageFailed] = useState(false)
 
   useEffect(() => { api(`/products/${view.params.id}`).then(r => { setProduct(r.product); setSize(r.product.sizes?.[0] || ''); setColor(r.product.colors?.[0] || '') }) }, [view.params.id, api])
+  useEffect(() => { setSizeGuideImageFailed(false) }, [product?.id, product?.sizeGuideImage, product?.sizeChartImage, product?.sizeChartUrl])
 
   if (!product) return <div className="py-32 text-center text-muted-foreground">Loading...</div>
+  const sizeGuideImage = getSizeGuideImage(product)
   const inWish = wishlist.includes(product.id)
   const stockStatusText = getStockStatusText(product)
   const productCollection = collections.find(collection => collection.slug === product.collection)
@@ -1038,8 +1047,8 @@ function ProductView() {
           <div className="mt-6 rounded-none border border-border p-4">
             <div className="text-[11px] tracking-editorial uppercase text-muted-foreground mb-3">Size Guide</div>
             <p className="text-xs text-muted-foreground mb-3">All measurements are in inches.</p>
-            {product.sizeGuideImage ? (
-              <img src={product.sizeGuideImage} alt="Size chart with measurements in inches" className="w-full h-auto object-contain" />
+            {sizeGuideImage && !sizeGuideImageFailed ? (
+              <img src={sizeGuideImage} alt="Size chart with measurements in inches" className="block max-w-full max-h-[32rem] mx-auto h-auto object-contain" onError={() => setSizeGuideImageFailed(true)} />
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[480px] text-sm">
@@ -1877,7 +1886,7 @@ function AdminProducts() {
               <div className="text-sm">{money(p.price)}</div>
               <Badge className={cx('rounded-none', stock <= lowStockThreshold ? 'bg-destructive text-destructive-foreground' : 'bg-muted text-foreground')}>Stock {stock}</Badge>
               <div className="flex gap-2">
-                <Button size="sm" variant="outline" className="rounded-none" onClick={() => setEditing({ ...p, images: p.images?.length ? p.images : [''] })}><Edit3 className="w-3.5 h-3.5" /></Button>
+                <Button size="sm" variant="outline" className="rounded-none" onClick={() => setEditing({ ...p, sizeGuideImage: getSizeGuideImage(p), images: p.images?.length ? p.images : [''] })}><Edit3 className="w-3.5 h-3.5" /></Button>
                 <Button size="sm" variant="outline" className="rounded-none" onClick={() => remove(p.id)}><Trash2 className="w-3.5 h-3.5" /></Button>
               </div>
             </div>
