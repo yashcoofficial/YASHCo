@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useMemo, useState, useCallback, createContext, useContext } from 'react'
+import { useEffect, useMemo, useState, useCallback, createContext, useContext, memo } from 'react'
 import { Toaster, toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -140,28 +140,50 @@ export default function App() {
 
   // Load initial
   useEffect(() => {
-    (async () => {
+    let mounted = true
+
+    ;(async () => {
       try {
-        const s = await api('/settings'); setSettings(s.settings)
-        const c = await api('/collections'); setCollections(c.collections || [])
-      } catch (e) { console.error(e) }
+        const [settingsRes, collectionsRes] = await Promise.all([
+          api('/settings'),
+          api('/collections'),
+        ])
+
+        if (!mounted) return
+        setSettings(settingsRes.settings)
+        setCollections(collectionsRes.collections || [])
+      } catch (e) {
+        console.error(e)
+      }
+
+      if (!mounted) return
       const t = localStorage.getItem('yash_token')
       if (t) setToken(t)
       const cc = localStorage.getItem('yash_cart')
       if (cc) try { setCart(JSON.parse(cc)) } catch { }
     })()
-  }, [])
+
+    return () => { mounted = false }
+  }, [api])
 
   // Auth check when token set
   useEffect(() => {
     if (!token) { setUser(null); return }
-    (async () => {
+
+    let mounted = true
+    ;(async () => {
       try {
         const r = await api('/auth/me')
+        if (!mounted) return
         if (r.user) setUser(r.user)
         else { setToken(null); localStorage.removeItem('yash_token') }
-      } catch { setToken(null); localStorage.removeItem('yash_token') }
+      } catch {
+        if (!mounted) return
+        setToken(null); localStorage.removeItem('yash_token')
+      }
     })()
+
+    return () => { mounted = false }
   }, [token, api])
 
   useEffect(() => { localStorage.setItem('yash_cart', JSON.stringify(cart)) }, [cart])
@@ -174,26 +196,31 @@ export default function App() {
   // Process logo to remove white background (canvas-based transparent conversion)
   useEffect(() => {
     if (!settings?.logoUrl) return
-    const img = new window.Image()
-    img.crossOrigin = 'anonymous'
-    img.onload = () => {
-      try {
-        const canvas = document.createElement('canvas')
-        canvas.width = img.naturalWidth
-        canvas.height = img.naturalHeight
-        const ctx = canvas.getContext('2d')
-        ctx.drawImage(img, 0, 0)
-        const d = ctx.getImageData(0, 0, canvas.width, canvas.height)
-        for (let i = 0; i < d.data.length; i += 4) {
-          const r = d.data[i], g = d.data[i + 1], b = d.data[i + 2]
-          if (r > 225 && g > 225 && b > 225) d.data[i + 3] = 0
-          else if (r > 200 && g > 200 && b > 200) d.data[i + 3] = Math.max(0, 255 - Math.round(((r + g + b) / 3 - 200) * 10))
-        }
-        ctx.putImageData(d, 0, 0)
-        setTransparentLogo(canvas.toDataURL('image/png'))
-      } catch (e) { /* CORS blocked, keep original with mix-blend */ }
-    }
-    img.src = settings.logoUrl
+
+    const schedule = window.requestAnimationFrame(() => {
+      const img = new window.Image()
+      img.crossOrigin = 'anonymous'
+      img.onload = () => {
+        try {
+          const canvas = document.createElement('canvas')
+          canvas.width = img.naturalWidth
+          canvas.height = img.naturalHeight
+          const ctx = canvas.getContext('2d')
+          ctx.drawImage(img, 0, 0)
+          const d = ctx.getImageData(0, 0, canvas.width, canvas.height)
+          for (let i = 0; i < d.data.length; i += 4) {
+            const r = d.data[i], g = d.data[i + 1], b = d.data[i + 2]
+            if (r > 225 && g > 225 && b > 225) d.data[i + 3] = 0
+            else if (r > 200 && g > 200 && b > 200) d.data[i + 3] = Math.max(0, 255 - Math.round(((r + g + b) / 3 - 200) * 10))
+          }
+          ctx.putImageData(d, 0, 0)
+          setTransparentLogo(canvas.toDataURL('image/png'))
+        } catch (e) { /* CORS blocked, keep original with mix-blend */ }
+      }
+      img.src = settings.logoUrl
+    })
+
+    return () => window.cancelAnimationFrame(schedule)
   }, [settings?.logoUrl])
 
   useEffect(() => {
@@ -274,7 +301,39 @@ export default function App() {
     api('/wishlist').then(r => setWishlist(r.productIds || [])).catch(() => { })
   }, [user, api])
 
-  const ctxValue = { view, navigate, user, token, setAuth, settings, setSettings, collections, setCollections, cart, addToCart, updateQty, removeFromCart, clearCart, wishlist, toggleWishlist, api, cartOpen, setCartOpen, menuOpen, setMenuOpen, transparentLogo, allProducts, setAllProducts, authModalOpen, setAuthModalOpen, pendingCheckout, setPendingCheckout, requestCheckoutAccess, feedbackOpen, setFeedbackOpen }
+  const ctxValue = useMemo(() => ({
+    view,
+    navigate,
+    user,
+    token,
+    setAuth,
+    settings,
+    setSettings,
+    collections,
+    setCollections,
+    cart,
+    addToCart,
+    updateQty,
+    removeFromCart,
+    clearCart,
+    wishlist,
+    toggleWishlist,
+    api,
+    cartOpen,
+    setCartOpen,
+    menuOpen,
+    setMenuOpen,
+    transparentLogo,
+    allProducts,
+    setAllProducts,
+    authModalOpen,
+    setAuthModalOpen,
+    pendingCheckout,
+    setPendingCheckout,
+    requestCheckoutAccess,
+    feedbackOpen,
+    setFeedbackOpen,
+  }), [view, navigate, user, token, settings, collections, cart, wishlist, api, cartOpen, menuOpen, transparentLogo, allProducts, authModalOpen, pendingCheckout, requestCheckoutAccess, feedbackOpen, setAuth, setSettings, setCollections, addToCart, updateQty, removeFromCart, clearCart, toggleWishlist, setCartOpen, setMenuOpen, setAllProducts, setAuthModalOpen, setPendingCheckout, setFeedbackOpen])
 
   if (!settings) return <div className="min-h-screen flex items-center justify-center bg-background"><Loader /></div>
 
@@ -414,17 +473,26 @@ function AnnouncementBar() {
   )
 }
 
-function Header() {
+const Header = memo(function Header() {
   const { navigate, user, cart, settings, setCartOpen, setMenuOpen, view, transparentLogo, collections } = useApp()
   const [scrolled, setScrolled] = useState(false)
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 20)
-    window.addEventListener('scroll', onScroll); return () => window.removeEventListener('scroll', onScroll)
+    let frame = 0
+    const onScroll = () => {
+      cancelAnimationFrame(frame)
+      frame = requestAnimationFrame(() => setScrolled(window.scrollY > 20))
+    }
+
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => {
+      cancelAnimationFrame(frame)
+      window.removeEventListener('scroll', onScroll)
+    }
   }, [])
   const cartCount = cart.reduce((s, x) => s + x.qty, 0)
   const transparent = view.name === 'home' && !scrolled
   const logoSrc = transparentLogo || settings.logoUrl
-  const navLinks = getVisibleNavItems(settings?.headerNavLinks, collections)
+  const navLinks = useMemo(() => getVisibleNavItems(settings?.headerNavLinks, collections), [settings?.headerNavLinks, collections])
   return (
     <header className={cx('sticky top-0 z-40 transition-all', transparent ? 'bg-transparent' : 'bg-background/90 backdrop-blur-md border-b border-border')}>
       <div className="max-w-[1400px] mx-auto px-4 md:px-8 h-20 flex items-center justify-between">
@@ -462,9 +530,9 @@ function Header() {
       </div>
     </header>
   )
-}
+})
 
-function MobileMenu() {
+const MobileMenu = memo(function MobileMenu() {
   const { menuOpen, setMenuOpen, navigate, user, settings, collections } = useApp()
   const [expandedCollections, setExpandedCollections] = useState([])
   const navLinks = getVisibleNavItems(settings?.headerNavLinks, collections)
@@ -508,9 +576,9 @@ function MobileMenu() {
       </SheetContent>
     </Sheet>
   )
-}
+})
 
-function CartDrawer() {
+const CartDrawer = memo(function CartDrawer() {
   const { cartOpen, setCartOpen, cart, updateQty, removeFromCart, navigate, settings, requestCheckoutAccess } = useApp()
   const subtotal = cart.reduce((s, x) => s + x.price * x.qty, 0)
   const shipping = cart.reduce((sum, item) => sum + (Number(item.shipping) || 0) * item.qty, 0)
@@ -559,7 +627,7 @@ function CartDrawer() {
       </SheetContent>
     </Sheet>
   )
-}
+})
 
 // ---------- Home ----------
 const DEFAULT_HOME_ORDER = ['hero', 'collections', 'featured', 'lookbook', 'about', 'concierge-cta', 'feedback']
@@ -567,7 +635,13 @@ const DEFAULT_HOME_ORDER = ['hero', 'collections', 'featured', 'lookbook', 'abou
 function HomeView() {
   const { settings, collections, navigate, api, setFeedbackOpen } = useApp()
   const [featured, setFeatured] = useState([])
-  useEffect(() => { api('/products?featured=true').then(r => setFeatured(r.products.slice(0, 4))).catch(() => { }) }, [api])
+  useEffect(() => {
+    let active = true
+    api('/products?featured=true')
+      .then((r) => { if (active) setFeatured(r.products.slice(0, 4)) })
+      .catch(() => { })
+    return () => { active = false }
+  }, [api])
 
   // Style helpers
   const heroH = settings.heroHeight || '100vh'
@@ -588,9 +662,15 @@ function HomeView() {
   const conBg = settings.conciergeCtaBg || 'light'
 
   const savedSectionOrder = Array.isArray(settings.homeSectionOrder) ? settings.homeSectionOrder : DEFAULT_HOME_ORDER
-  const sectionOrder = savedSectionOrder.includes('feedback') ? savedSectionOrder : [...savedSectionOrder, 'feedback']
+  const sectionOrder = useMemo(
+    () => (savedSectionOrder.includes('feedback') ? savedSectionOrder : [...savedSectionOrder, 'feedback']),
+    [savedSectionOrder]
+  )
   const vis = settings.homeSectionVisibility || {}
-  const visibleCollectionLinks = getBoutiqueNavItems(settings?.headerNavLinks, collections).filter((item) => item.collectionSlug)
+  const visibleCollectionLinks = useMemo(
+    () => getBoutiqueNavItems(settings?.headerNavLinks, collections).filter((item) => item.collectionSlug),
+    [settings?.headerNavLinks, collections]
+  )
   const collectionItems = visibleCollectionLinks
     .map((link) => {
       const collection = collections.find((c) => c.slug === link.collectionSlug)
@@ -734,7 +814,7 @@ function HomeView() {
   )
 }
 
-function ProductCard({ p, overrideImage, aspectRatio }) {
+const ProductCard = memo(function ProductCard({ p, overrideImage, aspectRatio }) {
   const { navigate, settings, toggleWishlist, wishlist } = useApp()
   const inWish = wishlist.includes(p.id)
   const stockStatusText = getStockStatusText(p)
@@ -763,7 +843,7 @@ function ProductCard({ p, overrideImage, aspectRatio }) {
       </div>
     </div>
   )
-}
+})
 
 // ---------- Page Section Renderers ----------
 function PageSection({ section }) {
