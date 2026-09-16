@@ -48,6 +48,29 @@ function escapeHtml(value) {
   return String(value || '').replace(/[&<>'"]/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[character]))
 }
 
+function hasTshirtItem(items = []) {
+  return (items || []).some(item => {
+    const text = [
+      item?.name,
+      item?.collection,
+      item?.category,
+      item?.slug,
+      item?.product?.name,
+      item?.product?.collection,
+      item?.product?.slug,
+    ].filter(Boolean).join(' ').toLowerCase()
+    return /t-?shirt|tshirt|tee/.test(text)
+  })
+}
+
+function getBillDiscountLabel(items = []) {
+  return hasTshirtItem(items) ? '40% T-shirt offer' : '10% sale discount'
+}
+
+function getBillOfferNote(items = []) {
+  return hasTshirtItem(items) ? '40% off on T-shirts only.' : 'Orders above ₹2,200 receive 10% off the sale-price subtotal.'
+}
+
 function printCourierBill(order, currencySymbol = '₹') {
   const bill = calculateBill(order.items, order.shipping)
   const address = order.shippingAddress || {}
@@ -55,7 +78,7 @@ function printCourierBill(order, currencySymbol = '₹') {
   const popup = window.open('', '_blank', 'noopener,noreferrer,width=760,height=900')
   if (!popup) {
     const rows = (order.items || []).map(item => `<li>${escapeHtml(item.name)} · ${escapeHtml(item.color)} · ${escapeHtml(item.size)} · Qty ${item.qty} — ${money(item.price * item.qty, currencySymbol)}</li>`).join('')
-    const fallbackHtml = `<!doctype html><html><head><meta charset="utf-8"><title>Courier Bill ${escapeHtml(order.orderNumber)}</title><style>body{font-family:Arial,sans-serif;max-width:700px;margin:40px;color:#171717}h1{font-size:24px}li{margin:10px 0}.total{font-weight:bold;border-top:1px solid #171717;padding-top:12px}</style></head><body><h1>YASHCO Temporary Courier Bill</h1><p>Order ${escapeHtml(order.orderNumber)}</p><h2>Deliver To</h2><p><strong>${escapeHtml(order.customerName)}</strong><br>${escapeHtml(order.customerPhone)}<br>${escapeHtml(address.line1)}<br>${escapeHtml(address.city)}, ${escapeHtml(address.state)} ${escapeHtml(address.pincode)}</p><h2>Items</h2><ul>${rows}</ul><p>Subtotal: ${money(bill.subtotal, currencySymbol)}</p>${bill.discountEligible ? `<p>10% Sale Discount: -${money(bill.discount, currencySymbol)}</p>` : ''}<p>Shipping: ${money(bill.shipping, currencySymbol)}</p><p class="total">Amount to Collect: ${money(bill.total, currencySymbol)}</p></body></html>`
+    const fallbackHtml = `<!doctype html><html><head><meta charset="utf-8"><title>Courier Bill ${escapeHtml(order.orderNumber)}</title><style>body{font-family:Arial,sans-serif;max-width:700px;margin:40px;color:#171717}h1{font-size:24px}li{margin:10px 0}.total{font-weight:bold;border-top:1px solid #171717;padding-top:12px}</style></head><body><h1>YASHCO Temporary Courier Bill</h1><p>Order ${escapeHtml(order.orderNumber)}</p><h2>Deliver To</h2><p><strong>${escapeHtml(order.customerName)}</strong><br>${escapeHtml(order.customerPhone)}<br>${escapeHtml(address.line1)}<br>${escapeHtml(address.city)}, ${escapeHtml(address.state)} ${escapeHtml(address.pincode)}</p><h2>Items</h2><ul>${rows}</ul><p>Subtotal: ${money(bill.subtotal, currencySymbol)}</p>${bill.discountEligible ? `<p>${escapeHtml(getBillDiscountLabel(order.items))}: -${money(bill.discount, currencySymbol)}</p>` : ''}<p>Shipping: ${money(bill.shipping, currencySymbol)}</p><p class="total">Amount to Collect: ${money(bill.total, currencySymbol)}</p></body></html>`
     const url = URL.createObjectURL(new Blob([fallbackHtml], { type: 'text/html' }))
     const anchor = document.createElement('a')
     anchor.href = url
@@ -65,7 +88,7 @@ function printCourierBill(order, currencySymbol = '₹') {
     toast.success('Courier bill generated and downloaded.')
     return
   }
-  popup.document.write(`<!doctype html><html><head><title>Courier Bill ${escapeHtml(order.orderNumber)}</title><style>body{font-family:Arial,sans-serif;color:#171717;margin:40px;max-width:680px}h1{font-size:24px;margin:0 0 4px}h2{font-size:14px;text-transform:uppercase;letter-spacing:.12em;margin:28px 0 10px;border-bottom:1px solid #ddd;padding-bottom:8px}p{margin:4px 0;font-size:13px}table{border-collapse:collapse;width:100%;font-size:13px}th,td{text-align:left;border-bottom:1px solid #ddd;padding:9px 4px}th:nth-child(2),td:nth-child(2){text-align:center;width:50px}th:last-child,td:last-child{text-align:right}.totals{margin:18px 0 0 auto;width:250px}.totals p{display:flex;justify-content:space-between}.total{border-top:1px solid #171717;padding-top:10px;font-weight:bold;font-size:16px}@media print{body{margin:20mm}}</style></head><body><h1>YASHCO Temporary Courier Bill</h1><p>Order ${escapeHtml(order.orderNumber)} · ${new Date(order.createdAt).toLocaleDateString()}</p><h2>Deliver To</h2><p><strong>${escapeHtml(order.customerName)}</strong></p><p>${escapeHtml(order.customerPhone)}</p><p>${escapeHtml(order.customerEmail)}</p><p>${escapeHtml(address.line1)}${address.line2 ? `<br>${escapeHtml(address.line2)}` : ''}<br>${escapeHtml(address.city)}, ${escapeHtml(address.state)} ${escapeHtml(address.pincode)}<br>${escapeHtml(address.country || 'India')}</p><h2>Items</h2><table><thead><tr><th>Product</th><th>Qty</th><th>Amount</th></tr></thead><tbody>${itemRows}</tbody></table><div class="totals"><p><span>Subtotal</span><span>${money(bill.subtotal, currencySymbol)}</span></p>${bill.discountEligible ? `<p><span>10% Sale Discount</span><span>-${money(bill.discount, currencySymbol)}</span></p>` : ''}<p><span>Shipping</span><span>${money(bill.shipping, currencySymbol)}</span></p><p class="total"><span>Amount to Collect</span><span>${money(bill.total, currencySymbol)}</span></p></div><p style="margin-top:28px">Temporary bill for courier delivery. Payment status: ${escapeHtml(order.paymentStatus || 'Awaiting Confirmation')}.</p></body></html>`)
+  popup.document.write(`<!doctype html><html><head><title>Courier Bill ${escapeHtml(order.orderNumber)}</title><style>body{font-family:Arial,sans-serif;color:#171717;margin:40px;max-width:680px}h1{font-size:24px;margin:0 0 4px}h2{font-size:14px;text-transform:uppercase;letter-spacing:.12em;margin:28px 0 10px;border-bottom:1px solid #ddd;padding-bottom:8px}p{margin:4px 0;font-size:13px}table{border-collapse:collapse;width:100%;font-size:13px}th,td{text-align:left;border-bottom:1px solid #ddd;padding:9px 4px}th:nth-child(2),td:nth-child(2){text-align:center;width:50px}th:last-child,td:last-child{text-align:right}.totals{margin:18px 0 0 auto;width:250px}.totals p{display:flex;justify-content:space-between}.total{border-top:1px solid #171717;padding-top:10px;font-weight:bold;font-size:16px}@media print{body{margin:20mm}}</style></head><body><h1>YASHCO Temporary Courier Bill</h1><p>Order ${escapeHtml(order.orderNumber)} · ${new Date(order.createdAt).toLocaleDateString()}</p><h2>Deliver To</h2><p><strong>${escapeHtml(order.customerName)}</strong></p><p>${escapeHtml(order.customerPhone)}</p><p>${escapeHtml(order.customerEmail)}</p><p>${escapeHtml(address.line1)}${address.line2 ? `<br>${escapeHtml(address.line2)}` : ''}<br>${escapeHtml(address.city)}, ${escapeHtml(address.state)} ${escapeHtml(address.pincode)}<br>${escapeHtml(address.country || 'India')}</p><h2>Items</h2><table><thead><tr><th>Product</th><th>Qty</th><th>Amount</th></tr></thead><tbody>${itemRows}</tbody></table><div class="totals"><p><span>Subtotal</span><span>${money(bill.subtotal, currencySymbol)}</span></p>${bill.discountEligible ? `<p><span>${escapeHtml(getBillDiscountLabel(order.items))}</span><span>-${money(bill.discount, currencySymbol)}</span></p>` : ''}<p><span>Shipping</span><span>${money(bill.shipping, currencySymbol)}</span></p><p class="total"><span>Amount to Collect</span><span>${money(bill.total, currencySymbol)}</span></p></div><p style="margin-top:28px">Temporary bill for courier delivery. Payment status: ${escapeHtml(order.paymentStatus || 'Awaiting Confirmation')}.</p></body></html>`)
   popup.document.close()
   const print = () => {
     popup.focus()
@@ -314,7 +337,7 @@ export default function App() {
       const key = `${product.id}|${size}|${color}`
       const i = prev.findIndex(x => x.key === key)
       if (i >= 0) { const copy = [...prev]; copy[i] = { ...copy[i], qty: copy[i].qty + qty }; return copy }
-      return [...prev, { key, id: product.id, name: product.name, price: product.salePrice || product.price, shipping: Number(product.shipping) || 0, image: product.images?.[0], size, color, qty }]
+      return [...prev, { key, id: product.id, name: product.name, collection: product.collection, category: product.category, slug: product.slug, price: product.salePrice || product.price, shipping: Number(product.shipping) || 0, image: product.images?.[0], size, color, qty }]
     })
     toast.success('Added to bag')
   }
@@ -651,10 +674,10 @@ const CartDrawer = memo(function CartDrawer() {
             </div>
             <div className="border-t border-border pt-4 space-y-4">
               <div className="flex justify-between text-sm"><span className="tracking-editorial uppercase text-xs">Subtotal</span><span>{money(bill.subtotal, settings.currencySymbol)}</span></div>
-              {bill.discountEligible && <div className="flex justify-between text-sm text-accent"><span>10% sale discount</span><span>-{money(bill.discount, settings.currencySymbol)}</span></div>}
+              {bill.discountEligible && <div className="flex justify-between text-sm text-accent"><span>{getBillDiscountLabel(cart)}</span><span>-{money(bill.discount, settings.currencySymbol)}</span></div>}
               <div className="flex justify-between text-sm"><span className="tracking-editorial uppercase text-xs">Shipping</span><span className={shipping === 0 ? 'text-accent tracking-editorial text-xs' : ''}>{shipping === 0 ? 'COMPLIMENTARY SHIPPING' : money(shipping, settings.currencySymbol)}</span></div>
               <div className="flex justify-between font-serif text-lg pt-3 border-t border-border"><span>Total</span><span>{money(bill.total, settings.currencySymbol)}</span></div>
-              <p className="text-xs text-muted-foreground">Orders above ₹2,200 receive 10% off the sale-price subtotal.</p>
+              <p className="text-xs text-muted-foreground">{getBillOfferNote(cart)}</p>
               <Button className="w-full rounded-none h-12 tracking-editorial uppercase text-xs" onClick={() => { setCartOpen(false); requestCheckoutAccess() }}>Proceed to Checkout</Button>
             </div>
           </>}
@@ -1307,10 +1330,10 @@ function CartView() {
           <div className="mt-12 flex justify-end">
             <div className="w-full md:w-96 space-y-4">
               <div className="flex justify-between"><span className="tracking-editorial uppercase text-xs">Subtotal</span><span>{money(bill.subtotal, settings.currencySymbol)}</span></div>
-              {bill.discountEligible && <div className="flex justify-between text-accent"><span>10% sale discount</span><span>-{money(bill.discount, settings.currencySymbol)}</span></div>}
+              {bill.discountEligible && <div className="flex justify-between text-accent"><span>{getBillDiscountLabel(cart)}</span><span>-{money(bill.discount, settings.currencySymbol)}</span></div>}
               <div className="flex justify-between"><span className="tracking-editorial uppercase text-xs">Shipping</span><span className={shipping === 0 ? 'text-accent tracking-editorial text-xs' : ''}>{shipping === 0 ? 'COMPLIMENTARY SHIPPING' : money(shipping, settings.currencySymbol)}</span></div>
               <div className="flex justify-between font-serif text-lg pt-3 border-t border-border"><span>Total</span><span>{money(bill.total, settings.currencySymbol)}</span></div>
-              <p className="text-xs text-muted-foreground">Orders above ₹2,200 receive 10% off the sale-price subtotal.</p>
+              <p className="text-xs text-muted-foreground">{getBillOfferNote(cart)}</p>
               <Button className="w-full rounded-none h-12 tracking-editorial uppercase text-xs" onClick={() => requestCheckoutAccess()}>Proceed to Checkout</Button>
             </div>
           </div>
@@ -1430,10 +1453,10 @@ function CheckoutView() {
           </div>
           <div className="pt-6 space-y-2 text-sm">
             <div className="flex justify-between"><span>Subtotal</span><span>{money(bill.subtotal, settings.currencySymbol)}</span></div>
-            {bill.discountEligible && <div className="flex justify-between text-accent"><span>10% sale discount</span><span>-{money(bill.discount, settings.currencySymbol)}</span></div>}
+            {bill.discountEligible && <div className="flex justify-between text-accent"><span>{getBillDiscountLabel(cart)}</span><span>-{money(bill.discount, settings.currencySymbol)}</span></div>}
             <div className="flex justify-between"><span>Shipping</span><span className={shipping === 0 ? 'text-accent tracking-editorial text-xs' : ''}>{shipping === 0 ? 'COMPLIMENTARY SHIPPING' : money(shipping, settings.currencySymbol)}</span></div>
             <div className="flex justify-between font-serif text-lg pt-3 border-t border-border"><span>Total</span><span>{money(bill.total, settings.currencySymbol)}</span></div>
-            <p className="text-xs text-muted-foreground pt-2">Orders above ₹2,200 receive 10% off the sale-price subtotal.</p>
+            <p className="text-xs text-muted-foreground pt-2">{getBillOfferNote(cart)}</p>
           </div>
           <div className="mt-6 text-xs text-muted-foreground bg-background/70 p-4 border border-border">
             Payment is arranged privately by our concierge after your order is confirmed. Submitting this form places a reserved enquiry with the atelier.
@@ -2190,7 +2213,7 @@ function AdminOrders() {
               {editing.items?.map(it => <div key={it.key} className="text-sm">{it.name} · {it.color} · {it.size} · x{it.qty} — {money(it.price * it.qty, settings.currencySymbol)}</div>)}
               <div className="mt-4 space-y-1 text-sm">
                 <div className="flex justify-between"><span>Subtotal</span><span>{money(calculateBill(editing.items, editing.shipping).subtotal, settings.currencySymbol)}</span></div>
-                {calculateBill(editing.items, editing.shipping).discountEligible && <div className="flex justify-between text-accent"><span>10% sale discount</span><span>-{money(calculateBill(editing.items, editing.shipping).discount, settings.currencySymbol)}</span></div>}
+                {calculateBill(editing.items, editing.shipping).discountEligible && <div className="flex justify-between text-accent"><span>{getBillDiscountLabel(editing.items)}</span><span>-{money(calculateBill(editing.items, editing.shipping).discount, settings.currencySymbol)}</span></div>}
                 <div className="flex justify-between"><span>Shipping</span><span>{money(editing.shipping, settings.currencySymbol)}</span></div>
                 <div className="flex justify-between font-medium border-t border-border pt-2"><span>Amount to collect</span><span>{money(calculateBill(editing.items, editing.shipping).total, settings.currencySymbol)}</span></div>
               </div>
