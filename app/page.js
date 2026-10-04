@@ -22,6 +22,7 @@ import {
 import { buildRouteForView, getBoutiqueNavItems, getVisibleNavItems, resolveViewFromPath } from '@/lib/navigation'
 import { validateCheckoutForm } from '@/lib/checkout-utils.mjs'
 import { calculateBill } from '@/lib/billing-utils.mjs'
+import { resolveColorValue } from '@/lib/color-utils.mjs'
 import { getStockStatusText } from '@/lib/stock-utils'
 
 // ---------- Context ----------
@@ -64,11 +65,11 @@ function hasTshirtItem(items = []) {
 }
 
 function getBillDiscountLabel(items = []) {
-  return hasTshirtItem(items) ? '40% T-shirt offer' : '10% sale discount'
+  return ''
 }
 
 function getBillOfferNote(items = []) {
-  return hasTshirtItem(items) ? '40% off on T-shirts only.' : 'Orders above ₹2,200 receive 10% off the sale-price subtotal.'
+  return ''
 }
 
 function printCourierBill(order, currencySymbol = '₹') {
@@ -125,21 +126,8 @@ function getSizeGuideImage(product) {
   return image?.trim() || ''
 }
 
-// Map friendly colour names to CSS colours for swatch previews
 function colorHex(name) {
-  const map = {
-    noir: '#0a0a0a', black: '#0a0a0a', jet: '#000000', ivory: '#f5efe6', white: '#ffffff', cream: '#f5efe6',
-    champagne: '#dcc8a1', gold: '#c8a15b', beige: '#c9b898', sand: '#d9c7a2', camel: '#b48a5b',
-    charcoal: '#333333', grey: '#808080', gray: '#808080', silver: '#c0c0c0',
-    navy: '#1e2a44', midnight: '#1a1a2e', blue: '#3d5a80', teal: '#2a6f6b',
-    emerald: '#046a38', forest: '#1e3d2f', olive: '#556b2f', sage: '#a3b18a',
-    burgundy: '#800020', maroon: '#800000', red: '#b0202e', wine: '#7b1e2b', rose: '#c98b8b', blush: '#f2d3d0',
-    pink: '#e8b4bc', mauve: '#a37f8f', lilac: '#c8a2c8', purple: '#6b3fa0', plum: '#5d3754',
-    brown: '#5b3a1f', chocolate: '#3d2418', tan: '#b48a5b', mocha: '#4a2f1d',
-    yellow: '#e5b83b', mustard: '#c99a2b', orange: '#c1622b',
-  }
-  const key = String(name || '').toLowerCase().trim()
-  return map[key] || '#8b7b5a'
+  return resolveColorValue(name)
 }
 
 // ---------- Root ----------
@@ -677,7 +665,7 @@ const CartDrawer = memo(function CartDrawer() {
               {bill.discountEligible && <div className="flex justify-between text-sm text-accent"><span>{getBillDiscountLabel(cart)}</span><span>-{money(bill.discount, settings.currencySymbol)}</span></div>}
               <div className="flex justify-between text-sm"><span className="tracking-editorial uppercase text-xs">Shipping</span><span className={shipping === 0 ? 'text-accent tracking-editorial text-xs' : ''}>{shipping === 0 ? 'COMPLIMENTARY SHIPPING' : money(shipping, settings.currencySymbol)}</span></div>
               <div className="flex justify-between font-serif text-lg pt-3 border-t border-border"><span>Total</span><span>{money(bill.total, settings.currencySymbol)}</span></div>
-              <p className="text-xs text-muted-foreground">{getBillOfferNote(cart)}</p>
+              {getBillOfferNote(cart) && <p className="text-xs text-muted-foreground">{getBillOfferNote(cart)}</p>}
               <Button className="w-full rounded-none h-12 tracking-editorial uppercase text-xs" onClick={() => { setCartOpen(false); requestCheckoutAccess() }}>Proceed to Checkout</Button>
             </div>
           </>}
@@ -1333,7 +1321,7 @@ function CartView() {
               {bill.discountEligible && <div className="flex justify-between text-accent"><span>{getBillDiscountLabel(cart)}</span><span>-{money(bill.discount, settings.currencySymbol)}</span></div>}
               <div className="flex justify-between"><span className="tracking-editorial uppercase text-xs">Shipping</span><span className={shipping === 0 ? 'text-accent tracking-editorial text-xs' : ''}>{shipping === 0 ? 'COMPLIMENTARY SHIPPING' : money(shipping, settings.currencySymbol)}</span></div>
               <div className="flex justify-between font-serif text-lg pt-3 border-t border-border"><span>Total</span><span>{money(bill.total, settings.currencySymbol)}</span></div>
-              <p className="text-xs text-muted-foreground">{getBillOfferNote(cart)}</p>
+              {getBillOfferNote(cart) && <p className="text-xs text-muted-foreground">{getBillOfferNote(cart)}</p>}
               <Button className="w-full rounded-none h-12 tracking-editorial uppercase text-xs" onClick={() => requestCheckoutAccess()}>Proceed to Checkout</Button>
             </div>
           </div>
@@ -1456,7 +1444,7 @@ function CheckoutView() {
             {bill.discountEligible && <div className="flex justify-between text-accent"><span>{getBillDiscountLabel(cart)}</span><span>-{money(bill.discount, settings.currencySymbol)}</span></div>}
             <div className="flex justify-between"><span>Shipping</span><span className={shipping === 0 ? 'text-accent tracking-editorial text-xs' : ''}>{shipping === 0 ? 'COMPLIMENTARY SHIPPING' : money(shipping, settings.currencySymbol)}</span></div>
             <div className="flex justify-between font-serif text-lg pt-3 border-t border-border"><span>Total</span><span>{money(bill.total, settings.currencySymbol)}</span></div>
-            <p className="text-xs text-muted-foreground pt-2">{getBillOfferNote(cart)}</p>
+            {getBillOfferNote(cart) && <p className="text-xs text-muted-foreground pt-2">{getBillOfferNote(cart)}</p>}
           </div>
           <div className="mt-6 text-xs text-muted-foreground bg-background/70 p-4 border border-border">
             Payment is arranged privately by our concierge after your order is confirmed. Submitting this form places a reserved enquiry with the atelier.

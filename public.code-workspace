@@ -7,28 +7,28 @@
 			"path": "services"
 		},
 		{
-			"path": "tests"
-		},
-		{
-			"path": "test_reports"
-		},
-		{
-			"path": "node_modules"
-		},
-		{
-			"path": "memory"
-		},
-		{
-			"path": "lib"
-		},
-		{
-			"path": "hooks"
+			"path": "app"
 		},
 		{
 			"path": "components"
 		},
 		{
-			"path": "app"
+			"path": "hooks"
+		},
+		{
+			"path": "lib"
+		},
+		{
+			"path": "memory"
+		},
+		{
+			"path": "node_modules"
+		},
+		{
+			"path": "test_reports"
+		},
+		{
+			"path": "tests"
 		}
 	]
 }
