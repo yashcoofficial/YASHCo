@@ -1983,7 +1983,7 @@ function AdminProducts() {
   const [editing, setEditing] = useState(null)
   const reload = () => api('/products').then(r => setProducts(r.products))
   useEffect(() => { reload() }, [])
-  const empty = { name: '', description: '', collection: 'womenswear', price: 0, shipping: 0, sku: '', stock: 0, images: [''], sizes: ['S', 'M', 'L', 'XL'], colors: ['Noir', 'Ivory', 'Champagne'], material: '', care: '', sizeGuide: '', sizeGuideImage: '', featured: false, lowStockThreshold: 3 }
+  const empty = { name: '', description: '', collection: 'womenswear', price: 0, salePrice: '', shipping: 0, sku: '', stock: 0, images: [''], sizes: ['S', 'M', 'L', 'XL'], colors: ['Noir', 'Ivory', 'Champagne'], material: '', care: '', sizeGuide: '', sizeGuideImage: '', featured: false, lowStockThreshold: 3 }
   const save = async () => {
     try {
       const body = { ...editing, images: editing.images.filter(Boolean) }
@@ -2009,8 +2009,9 @@ function AdminProducts() {
               <div>
                 <div className="font-serif text-lg">{p.name}</div>
                 <div className="text-xs text-muted-foreground">{p.collection} · SKU {p.sku}</div>
+                {p.salePrice && Number(p.salePrice) !== Number(p.price) ? <div className="text-[11px] text-accent">Offer {money(p.salePrice)} · MRP {money(p.price)}</div> : <div className="text-[11px] text-muted-foreground">Selling {money(p.price)}</div>}
               </div>
-              <div className="text-sm">{money(p.price)}</div>
+              <div className="text-sm">{p.salePrice && Number(p.salePrice) !== Number(p.price) ? <><span className="text-accent">{money(p.salePrice)}</span> <span className="line-through text-muted-foreground ml-1">{money(p.price)}</span></> : money(p.price)}</div>
               <Badge className={cx('rounded-none', stock <= lowStockThreshold ? 'bg-destructive text-destructive-foreground' : 'bg-muted text-foreground')}>Stock {stock}</Badge>
               <div className="flex gap-2">
                 <Button size="sm" variant="outline" className="rounded-none" onClick={() => setEditing({ ...p, sizeGuideImage: getSizeGuideImage(p), images: p.images?.length ? p.images : [''] })}><Edit3 className="w-3.5 h-3.5" /></Button>
@@ -2039,7 +2040,8 @@ function AdminProducts() {
                 </SelectContent>
               </Select>
               <Input placeholder="SKU" className="rounded-none" value={editing.sku} onChange={e => setEditing({ ...editing, sku: e.target.value })} />
-              <Input type="number" placeholder="Price (₹)" className="rounded-none" value={editing.price} onChange={e => setEditing({ ...editing, price: e.target.value })} />
+              <Input type="number" placeholder="Selling Price (₹)" className="rounded-none" value={editing.price} onChange={e => setEditing({ ...editing, price: e.target.value })} />
+              <Input type="number" min="0" placeholder="Offer Price (₹)" className="rounded-none" value={editing.salePrice ?? ''} onChange={e => setEditing({ ...editing, salePrice: e.target.value })} />
               <Input type="number" min="0" placeholder="Shipping charge (₹)" className="rounded-none" value={editing.shipping ?? 0} onChange={e => setEditing({ ...editing, shipping: e.target.value })} />
               <Input type="number" placeholder="Stock" className="rounded-none" value={editing.stock} onChange={e => setEditing({ ...editing, stock: e.target.value })} />
               <Input type="number" placeholder="Low stock threshold" className="rounded-none" value={editing.lowStockThreshold} onChange={e => setEditing({ ...editing, lowStockThreshold: e.target.value })} />
