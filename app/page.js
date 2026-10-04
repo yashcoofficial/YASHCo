@@ -874,7 +874,9 @@ const ProductCard = memo(function ProductCard({ p, overrideImage, aspectRatio })
       <div className="mt-4 space-y-1">
         <div className="text-[10px] tracking-editorial uppercase text-muted-foreground">{p.collection}</div>
         <div className="font-serif text-lg leading-tight">{p.name}</div>
-        <div className="text-sm">{money(p.price, settings.currencySymbol)}</div>
+        <div className="text-sm">
+          {p.salePrice && Number(p.salePrice) !== Number(p.price) ? <><span className="text-accent">{money(p.salePrice, settings.currencySymbol)}</span> <span className="line-through text-muted-foreground ml-2">{money(p.price, settings.currencySymbol)}</span></> : money(p.price, settings.currencySymbol)}
+        </div>
         {stockStatusText && <div className="text-[11px] tracking-editorial uppercase text-destructive">{stockStatusText}</div>}
         {p.colors?.length > 0 && (
           <div className="flex gap-1 pt-1">
@@ -1150,7 +1152,9 @@ function ProductView() {
         <div className="md:sticky md:top-28 h-fit">
           <div className="text-[11px] tracking-luxe uppercase text-accent mb-3">{collectionTrail}</div>
           <h1 className="font-serif text-4xl md:text-5xl">{product.name}</h1>
-          <div className="mt-4 text-lg">{money(product.price, settings.currencySymbol)}</div>
+          <div className="mt-4 text-lg">
+            {product.salePrice && Number(product.salePrice) !== Number(product.price) ? <><span className="text-accent">{money(product.salePrice, settings.currencySymbol)}</span> <span className="line-through text-muted-foreground ml-2">{money(product.price, settings.currencySymbol)}</span></> : money(product.price, settings.currencySymbol)}
+          </div>
           {stockStatusText && <div className="mt-3 inline-flex items-center rounded-none border border-destructive/30 bg-destructive/10 px-3 py-2 text-[11px] tracking-editorial uppercase text-destructive">{stockStatusText}</div>}
           <p className="text-muted-foreground mt-6 leading-relaxed whitespace-pre-wrap">{product.description}</p>
 
