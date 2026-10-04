@@ -8,6 +8,8 @@ test('returns the exact hex for admin-provided colors', () => {
   assert.equal(resolveColorValue('Dark Green'), '#006400')
   assert.equal(resolveColorValue('forest green'), '#228b22')
   assert.equal(resolveColorValue('dusty rose'), '#c8909e')
+  assert.equal(resolveColorValue('light blue'), '#add8e6')
+  assert.equal(resolveColorValue('rose gold'), '#b76e79')
 })
 
 test('falls back only for truly unknown values', () => {
