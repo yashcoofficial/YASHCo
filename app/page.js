@@ -325,7 +325,7 @@ export default function App() {
       const key = `${product.id}|${size}|${color}`
       const i = prev.findIndex(x => x.key === key)
       if (i >= 0) { const copy = [...prev]; copy[i] = { ...copy[i], qty: copy[i].qty + qty }; return copy }
-      return [...prev, { key, id: product.id, name: product.name, collection: product.collection, category: product.category, slug: product.slug, price: product.salePrice || product.price, shipping: Number(product.shipping) || 0, image: product.images?.[0], size, color, qty }]
+      return [...prev, { key, id: product.id, name: product.name, collection: product.collection, category: product.category, slug: product.slug, price: product.price, shipping: Number(product.shipping) || 0, image: product.images?.[0], size, color, qty }]
     })
     toast.success('Added to bag')
   }
@@ -870,14 +870,11 @@ const ProductCard = memo(function ProductCard({ p, overrideImage, aspectRatio })
         <button onClick={(e) => { e.stopPropagation(); toggleWishlist(p.id) }} className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/90 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
           <Heart className={cx('w-3.5 h-3.5', inWish ? 'fill-accent text-accent' : 'text-foreground')} />
         </button>
-        {p.onSale && <Badge className="absolute top-3 left-3 rounded-none bg-accent text-accent-foreground">Sale</Badge>}
       </div>
       <div className="mt-4 space-y-1">
         <div className="text-[10px] tracking-editorial uppercase text-muted-foreground">{p.collection}</div>
         <div className="font-serif text-lg leading-tight">{p.name}</div>
-        <div className="text-sm">
-          {p.salePrice ? <><span className="text-accent">{money(p.salePrice, settings.currencySymbol)}</span> <span className="line-through text-muted-foreground ml-2">{money(p.price, settings.currencySymbol)}</span></> : money(p.price, settings.currencySymbol)}
-        </div>
+        <div className="text-sm">{money(p.price, settings.currencySymbol)}</div>
         {stockStatusText && <div className="text-[11px] tracking-editorial uppercase text-destructive">{stockStatusText}</div>}
         {p.colors?.length > 0 && (
           <div className="flex gap-1 pt-1">
@@ -1153,9 +1150,7 @@ function ProductView() {
         <div className="md:sticky md:top-28 h-fit">
           <div className="text-[11px] tracking-luxe uppercase text-accent mb-3">{collectionTrail}</div>
           <h1 className="font-serif text-4xl md:text-5xl">{product.name}</h1>
-          <div className="mt-4 text-lg">
-            {product.salePrice ? <><span className="text-accent">{money(product.salePrice, settings.currencySymbol)}</span> <span className="line-through text-muted-foreground ml-2">{money(product.price, settings.currencySymbol)}</span></> : money(product.price, settings.currencySymbol)}
-          </div>
+          <div className="mt-4 text-lg">{money(product.price, settings.currencySymbol)}</div>
           {stockStatusText && <div className="mt-3 inline-flex items-center rounded-none border border-destructive/30 bg-destructive/10 px-3 py-2 text-[11px] tracking-editorial uppercase text-destructive">{stockStatusText}</div>}
           <p className="text-muted-foreground mt-6 leading-relaxed whitespace-pre-wrap">{product.description}</p>
 
@@ -1984,7 +1979,7 @@ function AdminProducts() {
   const [editing, setEditing] = useState(null)
   const reload = () => api('/products').then(r => setProducts(r.products))
   useEffect(() => { reload() }, [])
-  const empty = { name: '', description: '', collection: 'womenswear', price: 0, salePrice: '', shipping: 0, onSale: false, sku: '', stock: 0, images: [''], sizes: ['S', 'M', 'L', 'XL'], colors: ['Noir', 'Ivory', 'Champagne'], material: '', care: '', sizeGuide: '', sizeGuideImage: '', featured: false, lowStockThreshold: 3 }
+  const empty = { name: '', description: '', collection: 'womenswear', price: 0, shipping: 0, sku: '', stock: 0, images: [''], sizes: ['S', 'M', 'L', 'XL'], colors: ['Noir', 'Ivory', 'Champagne'], material: '', care: '', sizeGuide: '', sizeGuideImage: '', featured: false, lowStockThreshold: 3 }
   const save = async () => {
     try {
       const body = { ...editing, images: editing.images.filter(Boolean) }
@@ -2041,7 +2036,6 @@ function AdminProducts() {
               </Select>
               <Input placeholder="SKU" className="rounded-none" value={editing.sku} onChange={e => setEditing({ ...editing, sku: e.target.value })} />
               <Input type="number" placeholder="Price (₹)" className="rounded-none" value={editing.price} onChange={e => setEditing({ ...editing, price: e.target.value })} />
-              <Input type="number" placeholder="Sale Price (optional)" className="rounded-none" value={editing.salePrice || ''} onChange={e => setEditing({ ...editing, salePrice: e.target.value })} />
               <Input type="number" min="0" placeholder="Shipping charge (₹)" className="rounded-none" value={editing.shipping ?? 0} onChange={e => setEditing({ ...editing, shipping: e.target.value })} />
               <Input type="number" placeholder="Stock" className="rounded-none" value={editing.stock} onChange={e => setEditing({ ...editing, stock: e.target.value })} />
               <Input type="number" placeholder="Low stock threshold" className="rounded-none" value={editing.lowStockThreshold} onChange={e => setEditing({ ...editing, lowStockThreshold: e.target.value })} />
@@ -2090,7 +2084,6 @@ function AdminProducts() {
             </div>
             <div className="flex gap-6">
               <label className="flex items-center gap-2 text-sm"><Switch checked={editing.featured} onCheckedChange={v => setEditing({ ...editing, featured: v })} /> Featured</label>
-              <label className="flex items-center gap-2 text-sm"><Switch checked={editing.onSale} onCheckedChange={v => setEditing({ ...editing, onSale: v })} /> On Sale</label>
             </div>
           </div>}
           <DialogFooter><Button className="rounded-none tracking-editorial uppercase text-xs" onClick={save}>Save</Button></DialogFooter>
