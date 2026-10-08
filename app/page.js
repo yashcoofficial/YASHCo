@@ -405,6 +405,7 @@ export default function App() {
         {view.name === 'dashboard' && <DashboardView />}
         {view.name === 'admin' && <AdminView />}
         {view.name === 'about' && <AboutView />}
+        {view.name === 'policy' && <PolicyView />}
       </main>
       <Footer />
     </AppCtx.Provider>
@@ -2441,13 +2442,22 @@ function AdminSettings() {
   const removeSocialLink = (idx) => setForm(f => ({ ...f, socialLinks: (f.socialLinks || []).filter((_, i) => i !== idx) }))
   if (!form) return null
   return (
-    <div className="max-w-3xl space-y-6">
-      <h3 className="font-serif text-2xl">Website Editor</h3>
-      <div className="space-y-3">
-        <Label>Brand Name</Label><Input className="rounded-none" value={form.brand} onChange={e => setField('brand', e.target.value)} />
-        <Label>Slogan</Label><Input className="rounded-none" value={form.slogan} onChange={e => setField('slogan', e.target.value)} />
-        <Label>Logo URL</Label><Input className="rounded-none" value={form.logoUrl} onChange={e => setField('logoUrl', e.target.value)} />
-        <Label>Announcement Bar</Label><Input className="rounded-none" value={form.announcement || ''} onChange={e => setField('announcement', e.target.value)} />
+    <div className="max-w-5xl space-y-6">
+      <div>
+        <h3 className="font-serif text-2xl">Website Settings</h3>
+        <p className="mt-1 text-sm text-muted-foreground">Manage site identity, content, navigation, and customer policies.</p>
+      </div>
+      <Tabs defaultValue="site">
+        <TabsList className="h-auto w-full flex-wrap justify-start rounded-none border-b border-border bg-transparent p-0">
+          <TabsTrigger value="site" className="rounded-none px-5 py-3 text-xs uppercase tracking-editorial data-[state=active]:border-b-2 data-[state=active]:border-accent data-[state=active]:bg-transparent">Site Settings</TabsTrigger>
+          <TabsTrigger value="policies" className="rounded-none px-5 py-3 text-xs uppercase tracking-editorial data-[state=active]:border-b-2 data-[state=active]:border-accent data-[state=active]:bg-transparent">Policies</TabsTrigger>
+        </TabsList>
+        <TabsContent value="site" className="space-y-6 pt-6">
+      <div className="grid gap-4 border-b border-border pb-6 md:grid-cols-2">
+        <div className="space-y-2"><Label>Brand Name</Label><Input className="rounded-none" value={form.brand || ''} onChange={e => setField('brand', e.target.value)} /></div>
+        <div className="space-y-2"><Label>Slogan</Label><Input className="rounded-none" value={form.slogan || ''} onChange={e => setField('slogan', e.target.value)} /></div>
+        <div className="space-y-2"><Label>Logo URL</Label><Input className="rounded-none" value={form.logoUrl || ''} onChange={e => setField('logoUrl', e.target.value)} /></div>
+        <div className="space-y-2"><Label>Announcement Bar</Label><Input className="rounded-none" value={form.announcement || ''} onChange={e => setField('announcement', e.target.value)} /></div>
       </div>
       <div className="space-y-3 border-t border-border pt-6">
         <h4 className="font-serif text-xl">Hero</h4>
@@ -2514,6 +2524,20 @@ function AdminSettings() {
         <h4 className="font-serif text-xl">Footer</h4>
         <Label>Footer Copy</Label><Input className="rounded-none" value={form.footerCopy || ''} onChange={e => setField('footerCopy', e.target.value)} />
       </div>
+        </TabsContent>
+        <TabsContent value="policies" className="space-y-6 pt-6">
+          <div>
+            <h4 className="font-serif text-xl">Customer Policies</h4>
+            <p className="mt-1 text-sm text-muted-foreground">Add your policy text below. Saved policies appear as individual pages linked from the website footer.</p>
+          </div>
+          <div className="grid gap-8 lg:grid-cols-2">
+            <div className="space-y-2"><Label htmlFor="privacy-policy">Privacy Policy</Label><Textarea id="privacy-policy" rows={12} className="rounded-none" value={form.privacyPolicy || ''} onChange={e => setField('privacyPolicy', e.target.value)} placeholder="Enter your privacy policy..." /></div>
+            <div className="space-y-2"><Label htmlFor="refund-policy">Refund Policy</Label><Textarea id="refund-policy" rows={12} className="rounded-none" value={form.refundPolicy || ''} onChange={e => setField('refundPolicy', e.target.value)} placeholder="Enter your refund policy..." /></div>
+            <div className="space-y-2"><Label htmlFor="shipping-policy">Shipping Policy</Label><Textarea id="shipping-policy" rows={12} className="rounded-none" value={form.shippingPolicy || ''} onChange={e => setField('shippingPolicy', e.target.value)} placeholder="Enter your shipping policy..." /></div>
+            <div className="space-y-2"><Label htmlFor="terms-of-service">Terms of Service</Label><Textarea id="terms-of-service" rows={12} className="rounded-none" value={form.termsOfService || ''} onChange={e => setField('termsOfService', e.target.value)} placeholder="Enter your terms of service..." /></div>
+          </div>
+        </TabsContent>
+      </Tabs>
       <Button className="rounded-none tracking-editorial uppercase text-xs" onClick={save}>Save All Changes</Button>
     </div>
   )
@@ -3373,7 +3397,7 @@ function Footer() {
   const boutiqueLinks = getBoutiqueNavItems(settings?.headerNavLinks, collections)
   return (
     <footer className="bg-primary text-primary-foreground py-16 mt-20">
-      <div className="max-w-[1400px] mx-auto px-4 md:px-8 grid md:grid-cols-3 gap-10">
+      <div className="max-w-[1400px] mx-auto px-4 md:px-8 grid sm:grid-cols-2 lg:grid-cols-4 gap-10">
         <div>
           <div className="text-[11px] tracking-editorial uppercase text-primary-foreground/60 mb-4">Boutique</div>
           <div className="space-y-2 text-sm">
@@ -3387,6 +3411,12 @@ function Footer() {
           <div className="space-y-2 text-sm">
             <button className="block" onClick={() => navigate('about')}>The House</button>
             <button className="block" onClick={() => navigate('concierge')}>Concierge</button>
+          </div>
+        </div>
+        <div>
+          <div className="text-[11px] tracking-editorial uppercase text-primary-foreground/60 mb-4">Policies</div>
+          <div className="space-y-2 text-sm">
+            {POLICY_PAGES.map(policy => <button key={policy.slug} className="block text-left hover:text-white transition-colors" onClick={() => navigate('policy', { slug: policy.slug })}>{policy.title}</button>)}
           </div>
         </div>
         <div>
@@ -3414,5 +3444,28 @@ function Footer() {
         <div className="text-[11px] tracking-editorial uppercase text-primary-foreground/50 text-center">{settings.footerCopy}</div>
       </div>
     </footer>
+  )
+}
+
+const POLICY_PAGES = [
+  { slug: 'privacy-policy', title: 'Privacy Policy', settingKey: 'privacyPolicy' },
+  { slug: 'refund-policy', title: 'Refund Policy', settingKey: 'refundPolicy' },
+  { slug: 'shipping-policy', title: 'Shipping Policy', settingKey: 'shippingPolicy' },
+  { slug: 'terms-of-service', title: 'Terms of Service', settingKey: 'termsOfService' },
+]
+
+function PolicyView() {
+  const { view, settings } = useApp()
+  const policy = POLICY_PAGES.find(item => item.slug === view.params.slug)
+  if (!policy) return <div className="mx-auto max-w-3xl px-4 py-24 text-center"><h1 className="font-serif text-4xl">Page not found</h1></div>
+  const content = settings[policy.settingKey]
+  return (
+    <article className="mx-auto min-h-[60vh] max-w-3xl px-4 py-16 md:py-24">
+      <div className="mb-4 text-[11px] uppercase tracking-luxe text-accent">YASH · Customer Information</div>
+      <h1 className="font-serif text-4xl md:text-5xl">{policy.title}</h1>
+      <div className="mt-10 border-t border-border pt-8 text-sm leading-7 text-muted-foreground">
+        {content?.trim() ? <div className="whitespace-pre-wrap">{content}</div> : <p>This policy has not been published yet. Please contact our concierge for assistance.</p>}
+      </div>
+    </article>
   )
 }
