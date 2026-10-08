@@ -683,7 +683,7 @@ function HomeView() {
   useEffect(() => {
     let active = true
     api('/products?featured=true')
-      .then((r) => { if (active) setFeatured(r.products.slice(0, 4)) })
+      .then((r) => { if (active) setFeatured(r.products) })
       .catch(() => { })
     return () => { active = false }
   }, [api])
@@ -699,6 +699,7 @@ function HomeView() {
   const heroObjectPosition = settings.heroObjectPosition || 'center center'
   const collCols = settings.collectionsColumns || '3'
   const featCols = settings.featuredColumns || '4'
+  const featuredProductCount = Math.max(1, Math.min(12, Number(settings.featuredProductCount) || 4))
   const featBg = settings.featuredBg || 'muted'
   const lbStagger = settings.lookbookStagger !== 'false'
   const lbGap = settings.lookbookGap || 'sm'
@@ -795,7 +796,7 @@ function HomeView() {
               <div className={cx('grid gap-4 md:gap-8',
                 featCols === '2' && 'grid-cols-2', featCols === '3' && 'grid-cols-2 md:grid-cols-3', featCols === '4' && 'grid-cols-2 md:grid-cols-4',
               )}>
-                {featured.map((p, i) => <ProductCard key={p.id} p={p} overrideImage={featOverrides[i]} aspectRatio={settings.featuredAspect || '3/4'} />)}
+                {featured.slice(0, featuredProductCount).map((p, i) => <ProductCard key={p.id} p={p} overrideImage={featOverrides[i]} aspectRatio={settings.featuredAspect || '3/4'} />)}
               </div>
             </div>
           </section>
@@ -1022,6 +1023,12 @@ function ShopView() {
   const [filters, setFilters] = useState({ collection: view.params.collection || '', size: '', color: '', minPrice: '', maxPrice: '', search: '', sort: '' })
   const [loading, setLoading] = useState(true)
   const activeCollection = collections.find(collection => collection.slug === filters.collection)
+  const categoryParent = activeCollection?.parentSlug
+    ? collections.find(collection => collection.slug === activeCollection.parentSlug)
+    : activeCollection
+  const categoryItems = categoryParent
+    ? collections.filter(collection => collection.parentSlug === categoryParent.slug).sort((a, b) => (a.order || 0) - (b.order || 0))
+    : []
   const activeCollectionSlugs = activeCollection
     ? [activeCollection.slug, ...collections.filter(collection => collection.parentSlug === activeCollection.slug).map(collection => collection.slug)]
     : []
@@ -1058,13 +1065,33 @@ function ShopView() {
                 <div className="text-[11px] tracking-luxe uppercase text-accent mb-4">{s.content?.eyebrow || 'The Boutique'}</div>
                 <h1 className="font-serif text-5xl md:text-6xl uppercase">{activeCollection?.name || s.content?.title || 'Shop All'}</h1>
               </div>
-              <div className="max-w-xl mx-auto mb-12">
+              <div className="max-w-xl mx-auto mb-5">
                 <Label className="sr-only" htmlFor="shop-search">Search pieces</Label>
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input id="shop-search" value={filters.search} onChange={e => setFilters(f => ({ ...f, search: e.target.value }))} placeholder="Search pieces..." className="h-12 rounded-none pl-10 text-center" />
                 </div>
               </div>
+              {categoryItems.length > 0 && (
+                <nav aria-label={`${categoryParent.name} categories`} className="mb-12 -mx-4 overflow-x-auto px-4 md:mx-0 md:px-0">
+                  <div className="flex w-max min-w-full justify-center border-b border-border md:gap-2">
+                    {[{ id: categoryParent.id, name: `All ${categoryParent.name}`, slug: categoryParent.slug }, ...categoryItems].map(category => {
+                      const selected = filters.collection === category.slug
+                      return (
+                        <button
+                          key={category.id}
+                          type="button"
+                          onClick={() => navigate('shop', { collection: category.slug })}
+                          aria-current={selected ? 'page' : undefined}
+                          className={cx('shrink-0 border-b-2 px-4 py-3 text-[11px] tracking-editorial uppercase transition-colors', selected ? 'border-accent text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground')}
+                        >
+                          {category.name}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </nav>
+              )}
               <div>
                 <div>
                   <div className="flex items-center justify-between mb-6">
@@ -1983,13 +2010,20 @@ function AdminProducts() {
   const [editing, setEditing] = useState(null)
   const reload = () => api('/products').then(r => setProducts(r.products))
   useEffect(() => { reload() }, [])
-  const empty = { name: '', description: '', collection: 'womenswear', price: 0, salePrice: '', shipping: 0, sku: '', stock: 0, images: [''], sizes: ['S', 'M', 'L', 'XL'], colors: ['Noir', 'Ivory', 'Champagne'], material: '', care: '', sizeGuide: '', sizeGuideImage: '', featured: false, lowStockThreshold: 3 }
+  const empty = { name: '', description: '', collection: 'womenswear', price: 0, salePrice: '', shipping: 0, sku: '', stock: 0, images: [''], sizes: ['S', 'M', 'L', 'XL'], colors: ['Noir', 'Ivory', 'Champagne'], material: '', care: '', sizeGuide: '', sizeGuideImage: '', featured: false, hidden: false, lowStockThreshold: 3 }
   const save = async () => {
     try {
       const body = { ...editing, images: editing.images.filter(Boolean) }
       if (editing.id) await api(`/products/${editing.id}`, { method: 'PUT', body })
       else await api('/products', { method: 'POST', body })
       toast.success('Saved'); setEditing(null); reload()
+    } catch (e) { toast.error(e.message) }
+  }
+  const toggleVisibility = async (product) => {
+    try {
+      await api(`/products/${product.id}`, { method: 'PUT', body: { hidden: !product.hidden } })
+      toast.success(product.hidden ? 'Product is visible' : 'Product hidden from storefront')
+      reload()
     } catch (e) { toast.error(e.message) }
   }
   const remove = async (id) => { if (!confirm('Delete this product?')) return; await api(`/products/${id}`, { method: 'DELETE' }); reload() }
@@ -2009,11 +2043,13 @@ function AdminProducts() {
               <div>
                 <div className="font-serif text-lg">{p.name}</div>
                 <div className="text-xs text-muted-foreground">{p.collection} · SKU {p.sku}</div>
+                {p.hidden && <div className="text-[11px] uppercase tracking-editorial text-destructive mt-1">Hidden from storefront</div>}
                 {p.salePrice && Number(p.salePrice) !== Number(p.price) ? <div className="text-[11px] text-accent">Offer {money(p.salePrice)} · MRP {money(p.price)}</div> : <div className="text-[11px] text-muted-foreground">Selling {money(p.price)}</div>}
               </div>
               <div className="text-sm">{p.salePrice && Number(p.salePrice) !== Number(p.price) ? <><span className="text-accent">{money(p.salePrice)}</span> <span className="line-through text-muted-foreground ml-1">{money(p.price)}</span></> : money(p.price)}</div>
               <Badge className={cx('rounded-none', stock <= lowStockThreshold ? 'bg-destructive text-destructive-foreground' : 'bg-muted text-foreground')}>Stock {stock}</Badge>
               <div className="flex gap-2">
+                <Button size="sm" variant="outline" className="rounded-none" title={p.hidden ? 'Show product' : 'Hide product'} aria-label={p.hidden ? `Show ${p.name}` : `Hide ${p.name}`} onClick={() => toggleVisibility(p)}>{p.hidden ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}</Button>
                 <Button size="sm" variant="outline" className="rounded-none" onClick={() => setEditing({ ...p, sizeGuideImage: getSizeGuideImage(p), images: p.images?.length ? p.images : [''] })}><Edit3 className="w-3.5 h-3.5" /></Button>
                 <Button size="sm" variant="outline" className="rounded-none" onClick={() => remove(p.id)}><Trash2 className="w-3.5 h-3.5" /></Button>
               </div>
@@ -2090,6 +2126,7 @@ function AdminProducts() {
             </div>
             <div className="flex gap-6">
               <label className="flex items-center gap-2 text-sm"><Switch checked={editing.featured} onCheckedChange={v => setEditing({ ...editing, featured: v })} /> Featured</label>
+              <label className="flex items-center gap-2 text-sm"><Switch checked={!!editing.hidden} onCheckedChange={v => setEditing({ ...editing, hidden: v })} /> Hidden from storefront</label>
             </div>
           </div>}
           <DialogFooter><Button className="rounded-none tracking-editorial uppercase text-xs" onClick={save}>Save</Button></DialogFooter>
@@ -2565,6 +2602,16 @@ const HOME_SECTION_DEFS = [
         ]
       },
       {
+        key: 'featuredProductCount', label: 'Products to Feature', type: 'select', options: [
+          { value: '1', label: '1 Product' }, { value: '2', label: '2 Products' },
+          { value: '3', label: '3 Products' }, { value: '4', label: '4 Products' },
+          { value: '5', label: '5 Products' }, { value: '6', label: '6 Products' },
+          { value: '7', label: '7 Products' }, { value: '8', label: '8 Products' },
+          { value: '9', label: '9 Products' }, { value: '10', label: '10 Products' },
+          { value: '11', label: '11 Products' }, { value: '12', label: '12 Products' },
+        ]
+      },
+      {
         key: 'featuredBg', label: 'Background Style', type: 'select', options: [
           { value: 'muted', label: 'Muted Beige' }, { value: 'none', label: 'White' }, { value: 'dark', label: 'Dark' },
         ]
@@ -2577,7 +2624,7 @@ const HOME_SECTION_DEFS = [
     ],
     preview: (s, collections, featured) => {
       const overrides = (s.featuredImages || '').split('\n').map(x => x.trim()).filter(Boolean)
-      const items = featured?.length ? featured.slice(0, parseInt(s.featuredColumns || 4)) : [1, 2, 3, 4]
+      const items = featured?.length ? featured.slice(0, parseInt(s.featuredProductCount || 4, 10)) : Array.from({ length: parseInt(s.featuredProductCount || 4, 10) }, (_, i) => i + 1)
       return (
         <div style={{ background: s.featuredBg === 'dark' ? '#111' : s.featuredBg === 'muted' ? '#f5efe6' : 'white', padding: '16px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '12px' }}>
@@ -2726,7 +2773,7 @@ function AdminPageStudio() {
 
   // --- Fetched data for previewing live components ---
   const [featured, setFeatured] = useState([])
-  useEffect(() => { api('/products?featured=true').then(r => setFeatured(r.products.slice(0, 4))).catch(() => { }) }, [api])
+  useEffect(() => { api('/products?featured=true').then(r => setFeatured(r.products.slice(0, 12))).catch(() => { }) }, [api])
 
   useEffect(() => setLocalSettings({ ...settings }), [settings])
   useEffect(() => { if (settings?.homeSectionOrder) setHomeSectionOrder(settings.homeSectionOrder) }, [settings])

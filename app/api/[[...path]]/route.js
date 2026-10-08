@@ -425,8 +425,10 @@ async function route(req, method, segments) {
 
   if (root === 'products') {
     if (method === 'GET' && rest.length === 0) {
+      const user = await getUserFromReq(req)
       const q = new URL(req.url).searchParams
       const filter = {}
+      if (user?.role !== 'admin') filter.hidden = { $ne: true }
       if (q.get('collection')) {
         const selectedCollection = await database.collection('collections').findOne({ slug: q.get('collection') })
         const childSlugs = selectedCollection
@@ -449,8 +451,9 @@ async function route(req, method, segments) {
       return json({ products: items })
     }
     if (method === 'GET' && rest.length === 1) {
+      const user = await getUserFromReq(req)
       const p = await database.collection('products').findOne({ id: rest[0] })
-      if (!p) return json({ error: 'Not found' }, 404)
+      if (!p || (p.hidden && user?.role !== 'admin')) return json({ error: 'Not found' }, 404)
       return json({ product: stripId(p) })
     }
     const user = await getUserFromReq(req)
@@ -477,6 +480,7 @@ async function route(req, method, segments) {
         sizeGuide: body.sizeGuide || '',
         sizeGuideImage: body.sizeGuideImage || '',
         featured: !!body.featured,
+        hidden: !!body.hidden,
         lowStockThreshold: parseInt(body.lowStockThreshold) || 3,
         createdAt: new Date(),
       }
@@ -717,8 +721,12 @@ async function route(req, method, segments) {
     const authErr = requireAuth(user); if (authErr) return authErr
     if (method === 'GET') {
       const wl = await database.collection('wishlists').findOne({ userId: user.id })
-      const productIds = wl?.productIds || []
-      const products = productIds.length ? (await database.collection('products').find({ id: { $in: productIds } }).toArray()).map(stripId) : []
+      const savedProductIds = wl?.productIds || []
+      const productFilter = { id: { $in: savedProductIds } }
+      if (user.role !== 'admin') productFilter.hidden = { $ne: true }
+      const productDocs = savedProductIds.length ? await database.collection('products').find(productFilter).toArray() : []
+      const products = productDocs.map(stripId)
+      const productIds = user.role === 'admin' ? savedProductIds : products.map(product => product.id)
       return json({ productIds, products })
     }
     if (method === 'POST') {
