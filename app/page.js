@@ -14,7 +14,7 @@ import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { Switch } from '@/components/ui/switch'
 import {
-  ShoppingBag, Heart, User, Search, Menu, X, ChevronRight, ChevronLeft, ChevronDown, Plus, Minus,
+  ShoppingBag, Heart, User, Search, Menu, X, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Plus, Minus,
   Trash2, LogOut, Edit3, Package, Mail, MessageCircle, Settings as SettingsIcon,
   Truck, Star, Filter, Check, ArrowRight, Instagram, Facebook, Twitter,
   GripVertical, Eye, EyeOff, Download, ZoomIn,
@@ -2065,9 +2065,34 @@ function AdminProducts() {
   const { api, collections } = useApp()
   const [products, setProducts] = useState([])
   const [editing, setEditing] = useState(null)
+  const [draggedProductId, setDraggedProductId] = useState(null)
   const reload = () => api('/products?includeHidden=true').then(r => setProducts(r.products))
   useEffect(() => { reload() }, [])
   const empty = { name: '', description: '', collection: 'womenswear', price: 0, salePrice: '', shipping: 0, sku: '', stock: 0, images: [''], sizes: ['S', 'M', 'L', 'XL'], colors: ['Noir', 'Ivory', 'Champagne'], material: '', care: '', sizeGuide: '', sizeGuideImage: '', featured: false, hidden: false, lowStockThreshold: 3 }
+  const saveOrder = async (nextProducts) => {
+    setProducts(nextProducts)
+    try {
+      await api('/products/reorder', { method: 'PUT', body: { productIds: nextProducts.map(product => product.id) } })
+      toast.success('Product order saved')
+    } catch (e) {
+      toast.error(e.message)
+      reload()
+    }
+  }
+  const moveProduct = (fromIndex, toIndex) => {
+    if (toIndex < 0 || toIndex >= products.length || fromIndex === toIndex) return
+    const nextProducts = [...products]
+    const [product] = nextProducts.splice(fromIndex, 1)
+    nextProducts.splice(toIndex, 0, product)
+    saveOrder(nextProducts)
+  }
+  const dropProduct = (event, targetIndex) => {
+    event.preventDefault()
+    const productId = event.dataTransfer.getData('text/plain') || draggedProductId
+    const fromIndex = products.findIndex(product => product.id === productId)
+    setDraggedProductId(null)
+    if (fromIndex >= 0) moveProduct(fromIndex, targetIndex)
+  }
   const save = async () => {
     try {
       const body = { ...editing, images: editing.images.filter(Boolean) }
@@ -2095,7 +2120,20 @@ function AdminProducts() {
           const stock = Number(p.stock) || 0
           const lowStockThreshold = Number(p.lowStockThreshold) || 3
           return (
-            <div key={p.id} className="grid grid-cols-[60px_1fr_auto_auto_auto] gap-4 items-center border border-border p-3">
+            <div
+              key={p.id}
+              draggable
+              onDragStart={event => { event.dataTransfer.setData('text/plain', p.id); setDraggedProductId(p.id) }}
+              onDragOver={event => event.preventDefault()}
+              onDrop={event => dropProduct(event, products.findIndex(product => product.id === p.id))}
+              onDragEnd={() => setDraggedProductId(null)}
+              className={cx('grid grid-cols-[32px_60px_1fr_auto_auto_auto] gap-4 items-center border border-border p-3', draggedProductId === p.id && 'opacity-40')}
+            >
+              <div className="flex flex-col items-center">
+                <GripVertical className="w-4 h-4 text-muted-foreground cursor-grab" aria-hidden="true" />
+                <Button size="icon" variant="ghost" className="h-6 w-6 rounded-none" title="Move product up" aria-label={`Move ${p.name} up`} disabled={products.indexOf(p) === 0} onClick={() => moveProduct(products.indexOf(p), products.indexOf(p) - 1)}><ChevronUp className="w-3.5 h-3.5" /></Button>
+                <Button size="icon" variant="ghost" className="h-6 w-6 rounded-none" title="Move product down" aria-label={`Move ${p.name} down`} disabled={products.indexOf(p) === products.length - 1} onClick={() => moveProduct(products.indexOf(p), products.indexOf(p) + 1)}><ChevronDown className="w-3.5 h-3.5" /></Button>
+              </div>
               <img src={p.images?.[0]} className="w-14 h-16 object-cover" />
               <div>
                 <div className="font-serif text-lg">{p.name}</div>

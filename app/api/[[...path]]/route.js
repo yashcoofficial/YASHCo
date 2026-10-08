@@ -446,7 +446,7 @@ async function route(req, method, segments) {
       let cursor = database.collection('products').find(filter)
       if (sort === 'price_asc') cursor = cursor.sort({ price: 1 })
       else if (sort === 'price_desc') cursor = cursor.sort({ price: -1 })
-      else cursor = cursor.sort({ createdAt: -1 })
+      else cursor = cursor.sort({ sortOrder: 1, createdAt: -1 })
       const items = (await cursor.toArray()).map(stripId)
       return json({ products: items })
     }
@@ -457,8 +457,19 @@ async function route(req, method, segments) {
     }
     const user = await getUserFromReq(req)
     const admErr = requireAdmin(user); if (admErr) return admErr
+    if (method === 'PUT' && rest[0] === 'reorder') {
+      const body = await parseBody(req)
+      if (!Array.isArray(body.productIds)) return json({ error: 'Product order must be an array' }, 400)
+      if (body.productIds.length) {
+        await database.collection('products').bulkWrite(body.productIds.map((id, sortOrder) => ({
+          updateOne: { filter: { id }, update: { $set: { sortOrder } } },
+        })))
+      }
+      return json({ ok: true })
+    }
     if (method === 'POST' && rest.length === 0) {
       const body = await parseBody(req)
+      const sortOrder = await database.collection('products').countDocuments()
       const doc = {
         id: uuidv4(),
         name: body.name || 'Untitled',
@@ -481,6 +492,7 @@ async function route(req, method, segments) {
         featured: !!body.featured,
         hidden: !!body.hidden,
         lowStockThreshold: parseInt(body.lowStockThreshold) || 3,
+        sortOrder,
         createdAt: new Date(),
       }
       await database.collection('products').insertOne(doc)
