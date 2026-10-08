@@ -4,6 +4,7 @@ import crypto from 'crypto'
 import nodemailer from 'nodemailer'
 import { v4 as uuidv4 } from 'uuid'
 import { DEFAULT_NAV_ITEMS } from '../../../lib/navigation.js'
+import { calculateBill, getOfferPrice } from '../../../lib/billing-utils.mjs'
 
 // ---------- DB ----------
 let clientPromise
@@ -615,6 +616,36 @@ async function route(req, method, segments) {
     if (method === 'POST' && rest.length === 0) {
       const authErr = requireAuth(user); if (authErr) return authErr
       const body = await parseBody(req)
+      if (!Array.isArray(body.items) || body.items.length === 0 || body.items.some(item => !item?.id)) {
+        return json({ error: 'A valid cart is required' }, 400)
+      }
+      const productIds = [...new Set(body.items.map(item => item.id))]
+      const catalogProducts = await database.collection('products').find({ id: { $in: productIds }, hidden: { $ne: true } }).toArray()
+      const productsById = new Map(catalogProducts.map(product => [product.id, product]))
+      const orderItems = body.items.map(item => {
+        const product = productsById.get(item.id)
+        if (!product) return null
+        const originalPrice = Number(product.price) || 0
+        const offerPrice = getOfferPrice(product)
+        const qty = Math.max(1, Math.floor(Number(item.qty) || 1))
+        return {
+          key: item.key || `${product.id}|${item.size || ''}|${item.color || ''}`,
+          id: product.id,
+          name: product.name,
+          collection: product.collection,
+          slug: product.slug,
+          price: offerPrice,
+          ...(offerPrice < originalPrice ? { originalPrice } : {}),
+          shipping: Math.max(0, Number(product.shipping) || 0),
+          image: product.images?.[0] || '',
+          size: item.size || '',
+          color: item.color || '',
+          qty,
+        }
+      })
+      if (orderItems.some(item => !item)) return json({ error: 'One or more products are unavailable' }, 400)
+      const shipping = orderItems.reduce((sum, item) => sum + item.shipping * item.qty, 0)
+      const bill = calculateBill(orderItems, shipping)
       const doc = {
         id: uuidv4(),
         orderNumber: 'YSH' + Date.now().toString().slice(-8),
@@ -622,11 +653,11 @@ async function route(req, method, segments) {
         customerName: body.customerName || user?.name || '',
         customerEmail: body.customerEmail || user?.email || '',
         customerPhone: body.customerPhone || '',
-        items: body.items || [],
-        subtotal: body.subtotal || 0,
-        discount: body.discount || 0,
-        shipping: body.shipping || 0,
-        total: body.total || 0,
+        items: orderItems,
+        subtotal: bill.subtotal,
+        discount: bill.discount,
+        shipping: bill.shipping,
+        total: bill.total,
         shippingAddress: body.shippingAddress || {},
         notes: body.notes || '',
         status: 'Enquiry Received',

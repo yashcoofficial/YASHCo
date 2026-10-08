@@ -37,3 +37,18 @@ test('does not apply any promotional discount thresholds', async () => {
   assert.equal(calculateBill([{ price: 1100, qty: 2 }]).total, 2200)
   assert.equal(calculateBill([{ price: 2500, qty: 1 }]).discountEligible, false)
 })
+
+test('uses offer prices in the subtotal and calculates the percent off', async () => {
+  const { calculateBill, getDiscountPercentage } = await import('../lib/billing-utils.mjs')
+  const product = { price: 2000, salePrice: 1500, qty: 2 }
+  const bill = calculateBill([product], 100)
+
+  assert.equal(getDiscountPercentage(product), 25)
+  assert.deepEqual(bill, {
+    subtotal: 3000,
+    discount: 0,
+    shipping: 100,
+    total: 3100,
+    discountEligible: false,
+  })
+})

@@ -21,7 +21,7 @@ import {
 } from 'lucide-react'
 import { buildRouteForView, getBoutiqueNavItems, getVisibleNavItems, resolveViewFromPath } from '@/lib/navigation'
 import { validateCheckoutForm } from '@/lib/checkout-utils.mjs'
-import { calculateBill } from '@/lib/billing-utils.mjs'
+import { calculateBill, getDiscountPercentage, getOfferPrice } from '@/lib/billing-utils.mjs'
 import { resolveColorValue } from '@/lib/color-utils.mjs'
 import { getStockStatusText } from '@/lib/stock-utils'
 
@@ -325,7 +325,7 @@ export default function App() {
       const key = `${product.id}|${size}|${color}`
       const i = prev.findIndex(x => x.key === key)
       if (i >= 0) { const copy = [...prev]; copy[i] = { ...copy[i], qty: copy[i].qty + qty }; return copy }
-      return [...prev, { key, id: product.id, name: product.name, collection: product.collection, category: product.category, slug: product.slug, price: product.price, shipping: Number(product.shipping) || 0, image: product.images?.[0], size, color, qty }]
+      return [...prev, { key, id: product.id, name: product.name, collection: product.collection, category: product.category, slug: product.slug, price: getOfferPrice(product), originalPrice: Number(product.price) || 0, shipping: Number(product.shipping) || 0, image: product.images?.[0], size, color, qty }]
     })
     toast.success('Added to bag')
   }
@@ -655,7 +655,7 @@ const CartDrawer = memo(function CartDrawer() {
                         <span className="px-3 text-xs">{item.qty}</span>
                         <button className="px-2 py-1" onClick={() => updateQty(item.key, item.qty + 1)}><Plus className="w-3 h-3" /></button>
                       </div>
-                      <div className="text-sm">{money(item.price * item.qty, settings.currencySymbol)}</div>
+                      <div className="text-right text-sm">{Number(item.originalPrice) > Number(item.price) && <div className="line-through text-muted-foreground">{money(item.originalPrice * item.qty, settings.currencySymbol)}</div>}<div>{money(item.price * item.qty, settings.currencySymbol)}</div></div>
                     </div>
                   </div>
                 </div>
@@ -925,6 +925,7 @@ const ProductCard = memo(function ProductCard({ p, overrideImage, aspectRatio })
     <div className="group cursor-pointer" onClick={() => navigate('product', { id: p.id })}>
       <div className="bg-muted relative overflow-hidden" style={{ aspectRatio: aspectRatio || '3/4' }}>
         <img src={overrideImage || p.images?.[0]} alt={p.name} className="w-full h-full object-cover" />
+        {getDiscountPercentage(p) > 0 && <span className="absolute top-3 left-3 bg-accent text-accent-foreground px-2.5 py-1 text-[10px] tracking-editorial uppercase">{getDiscountPercentage(p)}% Off</span>}
         <button onClick={(e) => { e.stopPropagation(); toggleWishlist(p.id) }} className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/90 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
           <Heart className={cx('w-3.5 h-3.5', inWish ? 'fill-accent text-accent' : 'text-foreground')} />
         </button>
@@ -933,7 +934,7 @@ const ProductCard = memo(function ProductCard({ p, overrideImage, aspectRatio })
         <div className="text-[10px] tracking-editorial uppercase text-muted-foreground">{p.collection}</div>
         <div className="font-serif text-lg leading-tight">{p.name}</div>
         <div className="text-sm">
-          {p.salePrice && Number(p.salePrice) !== Number(p.price) ? <><span className="text-accent">{money(p.salePrice, settings.currencySymbol)}</span> <span className="line-through text-muted-foreground ml-2">{money(p.price, settings.currencySymbol)}</span></> : money(p.price, settings.currencySymbol)}
+          {getDiscountPercentage(p) > 0 ? <><span className="text-accent">{money(getOfferPrice(p), settings.currencySymbol)}</span> <span className="line-through text-muted-foreground ml-2">{money(p.price, settings.currencySymbol)}</span></> : money(p.price, settings.currencySymbol)}
         </div>
         {stockStatusText && <div className="text-[11px] tracking-editorial uppercase text-destructive">{stockStatusText}</div>}
         {p.colors?.length > 0 && (
@@ -1219,6 +1220,7 @@ function ProductView() {
             className="group relative block w-full aspect-[3/4] bg-muted overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             aria-label={`View larger image of ${product.name}`}>
             <img src={product.images?.[activeImg]} alt={product.name} className="w-full h-full object-cover" />
+            {getDiscountPercentage(product) > 0 && <span className="absolute top-4 left-4 bg-accent text-accent-foreground px-3 py-1.5 text-[11px] tracking-editorial uppercase">{getDiscountPercentage(product)}% Off</span>}
             <span className="absolute bottom-3 right-3 inline-flex items-center gap-2 bg-background/90 px-3 py-2 text-[10px] tracking-editorial uppercase opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
               <ZoomIn className="h-3.5 w-3.5" /> View image
             </span>
@@ -1237,7 +1239,7 @@ function ProductView() {
           <div className="text-[11px] tracking-luxe uppercase text-accent mb-3">{collectionTrail}</div>
           <h1 className="font-serif text-4xl md:text-5xl">{product.name}</h1>
           <div className="mt-4 text-lg">
-            {product.salePrice && Number(product.salePrice) !== Number(product.price) ? <><span className="text-accent">{money(product.salePrice, settings.currencySymbol)}</span> <span className="line-through text-muted-foreground ml-2">{money(product.price, settings.currencySymbol)}</span></> : money(product.price, settings.currencySymbol)}
+            {getDiscountPercentage(product) > 0 ? <><span className="text-accent">{money(getOfferPrice(product), settings.currencySymbol)}</span> <span className="line-through text-muted-foreground ml-2">{money(product.price, settings.currencySymbol)}</span></> : money(product.price, settings.currencySymbol)}
           </div>
           {stockStatusText && <div className="mt-3 inline-flex items-center rounded-none border border-destructive/30 bg-destructive/10 px-3 py-2 text-[11px] tracking-editorial uppercase text-destructive">{stockStatusText}</div>}
           <p className="text-muted-foreground mt-6 leading-relaxed whitespace-pre-wrap">{product.description}</p>
@@ -1391,7 +1393,8 @@ function CartView() {
                     <button className="px-3 py-2" onClick={() => updateQty(item.key, item.qty + 1)}><Plus className="w-3 h-3" /></button>
                   </div>
                 </div>
-                <div className="text-right">
+                  <div className="text-right">
+                  {Number(item.originalPrice) > Number(item.price) && <div className="text-sm line-through text-muted-foreground">{money(item.originalPrice * item.qty, settings.currencySymbol)}</div>}
                   <div>{money(item.price * item.qty, settings.currencySymbol)}</div>
                   <button className="text-xs text-muted-foreground mt-3 underline" onClick={() => removeFromCart(item.key)}>Remove</button>
                 </div>
@@ -1518,7 +1521,7 @@ function CheckoutView() {
                   <div>{item.name}</div>
                   <div className="text-xs text-muted-foreground">{item.color} · {item.size} · x{item.qty}</div>
                 </div>
-                <div className="text-sm">{money(item.price * item.qty, settings.currencySymbol)}</div>
+                <div className="text-right text-sm">{Number(item.originalPrice) > Number(item.price) && <div className="line-through text-muted-foreground">{money(item.originalPrice * item.qty, settings.currencySymbol)}</div>}<div>{money(item.price * item.qty, settings.currencySymbol)}</div></div>
               </div>
             ))}
           </div>
