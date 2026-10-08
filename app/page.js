@@ -675,7 +675,7 @@ const CartDrawer = memo(function CartDrawer() {
 })
 
 // ---------- Home ----------
-const DEFAULT_HOME_ORDER = ['hero', 'collections', 'featured', 'lookbook', 'about', 'concierge-cta', 'feedback']
+const DEFAULT_HOME_ORDER = ['hero', 'brand-worlds', 'collections', 'featured', 'lookbook', 'about', 'concierge-cta', 'feedback']
 
 function HomeView() {
   const { settings, collections, navigate, api, setFeedbackOpen } = useApp()
@@ -708,10 +708,12 @@ function HomeView() {
   const conBg = settings.conciergeCtaBg || 'light'
 
   const savedSectionOrder = Array.isArray(settings.homeSectionOrder) ? settings.homeSectionOrder : DEFAULT_HOME_ORDER
-  const sectionOrder = useMemo(
-    () => (savedSectionOrder.includes('feedback') ? savedSectionOrder : [...savedSectionOrder, 'feedback']),
-    [savedSectionOrder]
-  )
+  const sectionOrder = useMemo(() => {
+    const withBrandWorlds = savedSectionOrder.includes('brand-worlds')
+      ? savedSectionOrder
+      : [...savedSectionOrder.slice(0, 1), 'brand-worlds', ...savedSectionOrder.slice(1)]
+    return withBrandWorlds.includes('feedback') ? withBrandWorlds : [...withBrandWorlds, 'feedback']
+  }, [savedSectionOrder])
   const vis = settings.homeSectionVisibility || {}
   const visibleCollectionLinks = useMemo(
     () => getBoutiqueNavItems(settings?.headerNavLinks, collections).filter((item) => item.collectionSlug),
@@ -751,6 +753,60 @@ function HomeView() {
             )}>{settings.heroTitle}</h1>
             <p className="hero-subtitle whitespace-pre-line text-white/85 mt-4 sm:mt-6 max-w-[min(100%,36rem)] text-sm md:text-base leading-relaxed">{settings.heroSubtitle}</p>
             <Button onClick={() => navigate('shop')} className="hero-cta mt-8 sm:mt-10 rounded-none bg-white text-black hover:bg-white/90 h-12 px-6 sm:px-10 tracking-editorial uppercase text-xs max-w-full whitespace-nowrap">{settings.heroCtaLabel || 'Discover the Collection'}</Button>
+          </div>
+        </section>
+      )
+      case 'brand-worlds': return (
+        <section key="brand-worlds" className="bg-[#f1eee8] px-4 py-16 sm:px-6 md:py-24">
+          <div className="mx-auto max-w-[1400px]">
+            <div className="mb-8 flex flex-col gap-3 md:mb-12 md:flex-row md:items-end md:justify-between">
+              <div>
+                <div className="mb-3 text-[10px] uppercase tracking-[0.24em] text-[#9a7042]">Two expressions · One YASH</div>
+                <h2 className="font-serif text-3xl leading-tight sm:text-4xl md:text-5xl">Dress for every side of you.</h2>
+              </div>
+              <p className="max-w-sm text-sm leading-relaxed text-[#5e5a54]">Considered formalwear and everyday streetwear, for him and her.</p>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2 md:gap-6">
+              {[
+                {
+                  eyebrow: 'YASH Maison',
+                  title: 'Premium formalwear',
+                  description: 'Precise tailoring. Lasting presence.',
+                  image: 'https://images.pexels.com/photos/32335610/pexels-photo-32335610.jpeg',
+                  position: 'center 35%',
+                  tone: 'from-black/65 via-black/15 to-transparent',
+                },
+                {
+                  eyebrow: 'YASH Street',
+                  title: 'Streetwear, your way',
+                  description: 'Relaxed forms. Unmistakable attitude.',
+                  image: 'https://images.unsplash.com/photo-1529139574466-a303027c1d8b?auto=format&fit=crop&w=1800&q=85',
+                  position: 'center 30%',
+                  tone: 'from-black/75 via-black/20 to-transparent',
+                },
+              ].map((world) => (
+                <article key={world.eyebrow} className="group relative isolate min-h-[420px] overflow-hidden bg-[#25231f] sm:min-h-[520px]">
+                  <img src={world.image} alt="" className="absolute inset-0 -z-20 h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.03]" style={{ objectPosition: world.position }} />
+                  <div className={`absolute inset-0 -z-10 bg-gradient-to-t ${world.tone}`} />
+                  <div className="flex h-full min-h-[420px] flex-col justify-end p-6 text-white sm:min-h-[520px] sm:p-9 md:p-11">
+                    <div className="mb-3 text-[10px] uppercase tracking-[0.24em] text-white/75">{world.eyebrow}</div>
+                    <h3 className="font-serif text-3xl leading-tight sm:text-4xl md:text-5xl">{world.title}</h3>
+                    <p className="mt-2 text-sm text-white/80">{world.description}</p>
+                    <div className="mt-7 flex flex-wrap items-center gap-3">
+                      <span className="mr-1 text-[10px] uppercase tracking-[0.18em] text-white/65">Shop</span>
+                      {[
+                        { label: 'Men', slug: 'menswear' },
+                        { label: 'Women', slug: 'womenswear' },
+                      ].map((audience) => (
+                        <button key={audience.slug} onClick={() => navigate('shop', { collection: audience.slug })} className="inline-flex min-h-10 items-center gap-2 border border-white/55 px-4 text-[10px] uppercase tracking-[0.16em] transition-colors hover:border-white hover:bg-white hover:text-black">
+                          {audience.label}<ArrowRight className="h-3 w-3" />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
           </div>
         </section>
       )
@@ -2548,6 +2604,16 @@ const HOME_SECTION_DEFS = [
         </div>
       </div>
     )
+  },
+  {
+    id: 'brand-worlds', label: 'YASH Worlds', accent: '#6f4f3e',
+    fields: [],
+    preview: () => (
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', padding: '12px', background: '#f1eee8' }}>
+        <div style={{ background: '#312b26', color: 'white', padding: '20px 12px', fontFamily: 'Georgia,serif', fontSize: '16px' }}>YASH Maison<br /><span style={{ fontSize: '11px' }}>Premium formalwear</span></div>
+        <div style={{ background: '#292d2d', color: 'white', padding: '20px 12px', fontFamily: 'Georgia,serif', fontSize: '16px' }}>YASH Street<br /><span style={{ fontSize: '11px' }}>Streetwear</span></div>
+      </div>
+    ),
   },
   {
     id: 'collections', label: 'Collections Grid', accent: '#8b7b5a',
