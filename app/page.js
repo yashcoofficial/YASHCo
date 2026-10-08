@@ -2064,7 +2064,7 @@ function AdminProducts() {
   const { api, collections } = useApp()
   const [products, setProducts] = useState([])
   const [editing, setEditing] = useState(null)
-  const reload = () => api('/products').then(r => setProducts(r.products))
+  const reload = () => api('/products?includeHidden=true').then(r => setProducts(r.products))
   useEffect(() => { reload() }, [])
   const empty = { name: '', description: '', collection: 'womenswear', price: 0, salePrice: '', shipping: 0, sku: '', stock: 0, images: [''], sizes: ['S', 'M', 'L', 'XL'], colors: ['Noir', 'Ivory', 'Champagne'], material: '', care: '', sizeGuide: '', sizeGuideImage: '', featured: false, hidden: false, lowStockThreshold: 3 }
   const save = async () => {
