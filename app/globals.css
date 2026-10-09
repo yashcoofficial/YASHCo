@@ -70,14 +70,6 @@
   .img-zoom:hover img { transform: scale(1.06); }
   .divider-gold { height:1px; background: linear-gradient(90deg, transparent, hsl(var(--accent)) 50%, transparent); }
 
-  .brand-logo { filter: brightness(0); }
-  .brand-logo-fallback { filter: none; mix-blend-mode: multiply; }
-
-  @media (prefers-color-scheme: dark) {
-    .brand-logo { filter: brightness(0) invert(1); }
-    .brand-logo-fallback { filter: brightness(0) invert(1); mix-blend-mode: screen; }
-  }
-
   .hero-home-banner {
     min-height: var(--hero-height, 100vh);
     height: var(--hero-height, 100vh);
