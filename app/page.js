@@ -558,7 +558,7 @@ const Header = memo(function Header() {
           </nav>
         </div>
         <button onClick={() => navigate('home')} className="flex items-center justify-center">
-          <img src={logoSrc} alt={settings.brand} className={cx('h-12 md:h-14 object-contain', !transparentLogo && 'mix-blend-multiply', transparent && 'brightness-0 invert')} />
+          <img src={logoSrc} alt={settings.brand} className={cx('brand-logo h-12 md:h-14 object-contain', !transparentLogo && 'brand-logo-fallback')} />
         </button>
         <div className={cx('flex items-center gap-4 flex-1 justify-end', transparent ? 'text-white' : 'text-foreground')}>
           <button onClick={() => navigate('shop')} className="hidden md:block"><Search className="w-4 h-4" /></button>
