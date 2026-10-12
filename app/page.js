@@ -937,12 +937,6 @@ const ProductCard = memo(function ProductCard({ p, overrideImage, aspectRatio })
           {getDiscountPercentage(p) > 0 ? <><span className="text-accent">{money(getOfferPrice(p), settings.currencySymbol)}</span> <span className="line-through text-muted-foreground ml-2">{money(p.price, settings.currencySymbol)}</span></> : money(p.price, settings.currencySymbol)}
         </div>
         {stockStatusText && <div className="text-[11px] tracking-editorial uppercase text-destructive">{stockStatusText}</div>}
-        {p.colors?.length > 0 && (
-          <div className="flex gap-1 pt-1">
-            {p.colors.slice(0, 5).map(c => <span key={c} title={c} className="w-2.5 h-2.5 rounded-full border border-border" style={{ background: colorHex(c) }} />)}
-            {p.colors.length > 5 && <span className="text-[10px] text-muted-foreground ml-1">+{p.colors.length - 5}</span>}
-          </div>
-        )}
       </div>
     </div>
   )
@@ -1290,9 +1284,9 @@ function ProductView() {
           <div className="mt-6">
             <Label className="text-[11px] tracking-editorial uppercase text-muted-foreground">Colour: {color}</Label>
             <div className="mt-3 flex gap-2 flex-wrap">
-              {product.colors?.map(c => (
-                <button key={c} onClick={() => setColor(c)} className={cx('flex items-center gap-2 px-3 py-2 border text-xs', color === c ? 'border-primary bg-primary text-primary-foreground' : 'border-border')}>
-                  <span className="inline-block w-3.5 h-3.5 rounded-full border border-border" style={{ background: colorHex(c) }} />{c}
+              {product.colors?.map((c, index) => (
+                <button key={`${c}-${index}`} onClick={() => setColor(c)} className={cx('flex items-center gap-2 px-3 py-2 border text-xs', color === c ? 'border-primary bg-primary text-primary-foreground' : 'border-border')}>
+                  {c}
                 </button>
               ))}
             </div>
@@ -1332,12 +1326,12 @@ function ProductView() {
 function ProductImageDialog({ open, onOpenChange, image, productName }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-6xl border-none bg-black/95 p-3 text-white sm:p-6">
+      <DialogContent className="max-w-6xl border-none bg-white p-3 text-foreground sm:p-6">
         <DialogTitle className="sr-only">{productName} product image</DialogTitle>
-        <div className="flex min-h-[50vh] items-center justify-center">
+        <div className="flex min-h-[50vh] items-center justify-center bg-white">
           <img src={image} alt={productName} className="max-h-[80vh] w-auto max-w-full object-contain" />
         </div>
-        <p className="text-center text-sm text-white/80">{productName}</p>
+        <p className="text-center text-sm text-foreground/80">{productName}</p>
       </DialogContent>
     </Dialog>
   )
@@ -2071,7 +2065,7 @@ function AdminProducts() {
   const [draggedProductId, setDraggedProductId] = useState(null)
   const reload = () => api('/products?includeHidden=true').then(r => setProducts(r.products))
   useEffect(() => { reload() }, [])
-  const empty = { name: '', description: '', collection: 'womenswear', price: 0, salePrice: '', shipping: 0, sku: '', stock: 0, images: [''], sizes: ['S', 'M', 'L', 'XL'], colors: ['Noir', 'Ivory', 'Champagne'], material: '', care: '', sizeGuide: '', sizeGuideImage: '', featured: false, hidden: false, lowStockThreshold: 3 }
+  const empty = { name: '', description: '', collection: 'womenswear', price: 0, salePrice: '', shipping: 0, sku: '', stock: 0, images: [''], sizes: ['S', 'M', 'L', 'XL'], colors: ['Noir', 'Ivory', 'Champagne'], colorHexes: [], material: '', care: '', sizeGuide: '', sizeGuideImage: '', featured: false, hidden: false, lowStockThreshold: 3 }
   const saveOrder = async (nextProducts) => {
     setProducts(nextProducts)
     try {
@@ -2191,7 +2185,44 @@ function AdminProducts() {
               <Button variant="outline" size="sm" className="rounded-none mt-2" onClick={() => setEditing({ ...editing, images: [...editing.images, ''] })}>+ Add Image</Button>
             </div>
             <Input placeholder="Sizes (comma separated)" className="rounded-none" value={Array.isArray(editing.sizes) ? editing.sizes.join(',') : ''} onChange={e => setEditing({ ...editing, sizes: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })} />
-            <Input placeholder="Colors (comma separated)" className="rounded-none" value={Array.isArray(editing.colors) ? editing.colors.join(',') : ''} onChange={e => setEditing({ ...editing, colors: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })} />
+            <div className="space-y-2">
+              <Label className="text-xs">Colours and exact swatch colours</Label>
+              <Input
+                placeholder="Colours (comma separated)"
+                className="rounded-none"
+                value={Array.isArray(editing.colors) ? editing.colors.join(',') : ''}
+                onChange={e => {
+                  const colors = e.target.value.split(',').map(s => s.trim()).filter(Boolean)
+                  const hexesByName = new Map()
+                  editing.colors?.forEach((name, index) => {
+                    const hexes = hexesByName.get(name) || []
+                    hexes.push(editing.colorHexes?.[index] || '')
+                    hexesByName.set(name, hexes)
+                  })
+                  const colorHexes = colors.map(name => hexesByName.get(name)?.shift() || '')
+                  setEditing({ ...editing, colors, colorHexes })
+                }}
+              />
+              <div className="grid grid-cols-2 gap-3">
+                {(editing.colors || []).map((name, index) => (
+                  <label key={`${name}-${index}`} className="flex items-center gap-2 border border-border px-3 py-2 text-xs">
+                    <input
+                      type="color"
+                      aria-label={`Swatch colour for ${name}`}
+                      value={editing.colorHexes?.[index] || colorHex(name)}
+                      onChange={e => {
+                        const colorHexes = [...(editing.colorHexes || [])]
+                        colorHexes[index] = e.target.value
+                        setEditing({ ...editing, colorHexes })
+                      }}
+                      className="h-7 w-9 cursor-pointer border-0 bg-transparent p-0"
+                    />
+                    <span>{name}</span>
+                    <span className="ml-auto text-muted-foreground">{editing.colorHexes?.[index] || colorHex(name)}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
             <Textarea placeholder="Material & Craft" rows={2} className="rounded-none" value={editing.material} onChange={e => setEditing({ ...editing, material: e.target.value })} />
             <Textarea placeholder="Care instructions" rows={2} className="rounded-none" value={editing.care} onChange={e => setEditing({ ...editing, care: e.target.value })} />
             <Textarea placeholder="Size guide for customers" rows={4} className="rounded-none" value={editing.sizeGuide || ''} onChange={e => setEditing({ ...editing, sizeGuide: e.target.value })} />

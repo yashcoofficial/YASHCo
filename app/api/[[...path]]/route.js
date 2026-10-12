@@ -486,6 +486,7 @@ async function route(req, method, segments) {
         images: body.images || [],
         sizes: body.sizes || ['XS','S','M','L','XL'],
         colors: body.colors || ['Noir'],
+        colorHexes: Array.isArray(body.colorHexes) ? body.colorHexes : [],
         material: body.material || '',
         care: body.care || '',
         sizeGuide: body.sizeGuide || '',
