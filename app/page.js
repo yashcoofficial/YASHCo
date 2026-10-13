@@ -22,7 +22,7 @@ import {
 import { buildRouteForView, getBoutiqueNavItems, getVisibleNavItems, resolveViewFromPath } from '@/lib/navigation'
 import { validateCheckoutForm } from '@/lib/checkout-utils.mjs'
 import { calculateBill, getDiscountPercentage, getOfferPrice } from '@/lib/billing-utils.mjs'
-import { resolveColorValue } from '@/lib/color-utils.mjs'
+import { resolveColorValue, getColorSwatches } from '@/lib/color-utils.mjs'
 import { getStockStatusText } from '@/lib/stock-utils'
 
 // ---------- Context ----------
@@ -921,6 +921,8 @@ const ProductCard = memo(function ProductCard({ p, overrideImage, aspectRatio })
   const { navigate, settings, toggleWishlist, wishlist } = useApp()
   const inWish = wishlist.includes(p.id)
   const stockStatusText = getStockStatusText(p)
+  const swatches = getColorSwatches(p.colors || [], p.colorHexes || []).slice(0, 4)
+
   return (
     <div className="group cursor-pointer" onClick={() => navigate('product', { id: p.id })}>
       <div className="bg-muted relative overflow-hidden" style={{ aspectRatio: aspectRatio || '3/4' }}>
@@ -936,6 +938,13 @@ const ProductCard = memo(function ProductCard({ p, overrideImage, aspectRatio })
         <div className="text-sm">
           {getDiscountPercentage(p) > 0 ? <><span className="text-accent">{money(getOfferPrice(p), settings.currencySymbol)}</span> <span className="line-through text-muted-foreground ml-2">{money(p.price, settings.currencySymbol)}</span></> : money(p.price, settings.currencySymbol)}
         </div>
+        {swatches.length > 0 && (
+          <div className="flex items-center gap-1.5 pt-1">
+            {swatches.map((hex, index) => (
+              <span key={`${p.id}-swatch-${index}`} title={p.colors?.[index] || 'Colour'} className="block h-3.5 w-3.5 rounded-full border border-black/10" style={{ backgroundColor: hex }} />
+            ))}
+          </div>
+        )}
         {stockStatusText && <div className="text-[11px] tracking-editorial uppercase text-destructive">{stockStatusText}</div>}
       </div>
     </div>
@@ -1284,11 +1293,21 @@ function ProductView() {
           <div className="mt-6">
             <Label className="text-[11px] tracking-editorial uppercase text-muted-foreground">Colour: {color}</Label>
             <div className="mt-3 flex gap-2 flex-wrap">
-              {product.colors?.map((c, index) => (
-                <button key={`${c}-${index}`} onClick={() => setColor(c)} className={cx('flex items-center gap-2 px-3 py-2 border text-xs', color === c ? 'border-primary bg-primary text-primary-foreground' : 'border-border')}>
-                  {c}
-                </button>
-              ))}
+              {product.colors?.map((c, index) => {
+                const swatchHex = getColorSwatches(product.colors || [], product.colorHexes || [])[index] || colorHex(c)
+                return (
+                  <button
+                    key={`${c}-${index}`}
+                    onClick={() => setColor(c)}
+                    className={cx('flex items-center gap-2 border px-3 py-2 text-xs transition-colors', color === c ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-background')}
+                    type="button"
+                    aria-label={`Choose ${c} colour`}
+                  >
+                    <span className="h-4 w-4 rounded-full border border-black/10" style={{ backgroundColor: swatchHex }} />
+                    <span>{c}</span>
+                  </button>
+                )
+              })}
             </div>
           </div>
 
