@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from '@/components/ui/dialog'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select'
@@ -21,7 +21,7 @@ import {
 } from 'lucide-react'
 import { buildRouteForView, getBoutiqueNavItems, getVisibleNavItems, resolveViewFromPath } from '@/lib/navigation'
 import { validateCheckoutForm } from '@/lib/checkout-utils.mjs'
-import { calculateBill, getDiscountPercentage, getOfferPrice } from '@/lib/billing-utils.mjs'
+import { calculateBill, getDiscountPercentage, getOfferPrice, PROMO_CODE, PROMO_MINIMUM_SUBTOTAL } from '@/lib/billing-utils.mjs'
 import { resolveColorValue, getColorSwatches } from '@/lib/color-utils.mjs'
 import { getStockStatusText } from '@/lib/stock-utils'
 
@@ -65,15 +65,15 @@ function hasTshirtItem(items = []) {
 }
 
 function getBillDiscountLabel(items = []) {
-  return ''
+  return `Promo code ${PROMO_CODE} (15% off)`
 }
 
 function getBillOfferNote(items = []) {
-  return ''
+  return `Use code ${PROMO_CODE} for 15% off orders above ₹${PROMO_MINIMUM_SUBTOTAL.toLocaleString('en-IN')}.`
 }
 
 function printCourierBill(order, currencySymbol = '₹') {
-  const bill = calculateBill(order.items, order.shipping)
+  const bill = calculateBill(order.items, order.shipping, order.promoCode)
   const address = order.shippingAddress || {}
   const itemRows = (order.items || []).map(item => `<tr><td>${escapeHtml(item.name)}<br><small>${escapeHtml(item.color)} · ${escapeHtml(item.size)}</small></td><td>${item.qty}</td><td>${money(item.price * item.qty, currencySymbol)}</td></tr>`).join('')
   const popup = window.open('', '_blank', 'noopener,noreferrer,width=760,height=900')
@@ -143,6 +143,7 @@ export default function App() {
   const [settings, setSettings] = useState(null)
   const [collections, setCollections] = useState([])
   const [cart, setCart] = useState([])
+  const [promoCode, setPromoCode] = useState('')
   const [wishlist, setWishlist] = useState([])
   const [menuOpen, setMenuOpen] = useState(false)
   const [cartOpen, setCartOpen] = useState(false)
@@ -151,6 +152,7 @@ export default function App() {
   const [feedbackOpen, setFeedbackOpen] = useState(false)
   const [transparentLogo, setTransparentLogo] = useState(null)
   const [allProducts, setAllProducts] = useState([])
+  const [promoPopupOpen, setPromoPopupOpen] = useState(false)
 
   const api = useCallback(async (path, opts = {}) => {
     const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) }
@@ -230,6 +232,12 @@ export default function App() {
   }, [token, api])
 
   useEffect(() => { localStorage.setItem('yash_cart', JSON.stringify(cart)) }, [cart])
+
+  useEffect(() => {
+    if (view.name !== 'home' || sessionStorage.getItem('yash15_welcome_seen')) return
+    sessionStorage.setItem('yash15_welcome_seen', 'true')
+    setPromoPopupOpen(true)
+  }, [view.name])
 
   // Fetch all products once (for dynamic filter facets)
   useEffect(() => {
@@ -331,7 +339,7 @@ export default function App() {
   }
   const updateQty = (key, qty) => setCart(prev => prev.map(x => x.key === key ? { ...x, qty: Math.max(1, qty) } : x))
   const removeFromCart = (key) => setCart(prev => prev.filter(x => x.key !== key))
-  const clearCart = () => setCart([])
+  const clearCart = () => { setCart([]); setPromoCode('') }
 
   const toggleWishlist = async (productId) => {
     if (!user) { toast.error('Please sign in to save favourites'); navigate('login'); return }
@@ -355,6 +363,8 @@ export default function App() {
     collections,
     setCollections,
     cart,
+    promoCode,
+    setPromoCode,
     addToCart,
     updateQty,
     removeFromCart,
@@ -376,7 +386,7 @@ export default function App() {
     requestCheckoutAccess,
     feedbackOpen,
     setFeedbackOpen,
-  }), [view, navigate, user, token, settings, collections, cart, wishlist, api, cartOpen, menuOpen, transparentLogo, allProducts, authModalOpen, pendingCheckout, requestCheckoutAccess, feedbackOpen, setAuth, setSettings, setCollections, addToCart, updateQty, removeFromCart, clearCart, toggleWishlist, setCartOpen, setMenuOpen, setAllProducts, setAuthModalOpen, setPendingCheckout, setFeedbackOpen])
+  }), [view, navigate, user, token, settings, collections, cart, promoCode, wishlist, api, cartOpen, menuOpen, transparentLogo, allProducts, authModalOpen, pendingCheckout, requestCheckoutAccess, feedbackOpen, setAuth, setSettings, setCollections, addToCart, updateQty, removeFromCart, clearCart, toggleWishlist, setCartOpen, setMenuOpen, setAllProducts, setAuthModalOpen, setPendingCheckout, setFeedbackOpen])
 
   if (!settings) return <div className="min-h-screen flex items-center justify-center bg-background"><Loader /></div>
 
@@ -384,6 +394,7 @@ export default function App() {
     <AppCtx.Provider value={ctxValue}>
       <Toaster position="top-center" toastOptions={{ className: 'font-sans text-sm' }} />
       <AuthGateModal />
+      <WelcomePromoDialog open={promoPopupOpen} onOpenChange={setPromoPopupOpen} />
       <FeedbackDialog />
       <AnnouncementBar />
       <Header />
@@ -413,6 +424,25 @@ export default function App() {
 }
 
 function Loader() { return <div className="text-foreground/60 text-xs tracking-luxe uppercase">YASH</div> }
+
+function WelcomePromoDialog({ open, onOpenChange }) {
+  const { navigate } = useApp()
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="w-[calc(100%-2rem)] max-w-md rounded-none border border-[#b89b6a] bg-[#222824] p-8 text-[#f8f4ed] sm:p-10">
+        <div className="text-[10px] uppercase tracking-[0.24em] text-[#d1b887]">A welcome from YASH</div>
+        <DialogHeader className="items-center text-center">
+          <DialogTitle className="font-serif text-5xl font-normal">15% off</DialogTitle>
+        </DialogHeader>
+        <DialogDescription className="text-center text-sm leading-relaxed text-white/75">Enjoy 15% off orders above ₹4,999 with your first-visit code.</DialogDescription>
+        <div className="border border-dashed border-[#b89b6a]/70 py-4 text-center font-serif text-2xl tracking-[0.18em]">{PROMO_CODE}</div>
+        <Button className="h-12 w-full rounded-none bg-[#d1b887] text-xs uppercase tracking-editorial text-[#222824] hover:bg-[#e0cca3]" onClick={() => { onOpenChange(false); navigate('shop') }}>
+          Shop the collection <ArrowRight className="ml-2 h-4 w-4" />
+        </Button>
+      </DialogContent>
+    </Dialog>
+  )
+}
 
 function AuthGateModal() {
   const { api, setAuth, navigate, authModalOpen, setAuthModalOpen, pendingCheckout, setPendingCheckout } = useApp()
@@ -623,9 +653,9 @@ const MobileMenu = memo(function MobileMenu() {
 })
 
 const CartDrawer = memo(function CartDrawer() {
-  const { cartOpen, setCartOpen, cart, updateQty, removeFromCart, navigate, settings, requestCheckoutAccess } = useApp()
+  const { cartOpen, setCartOpen, cart, promoCode, updateQty, removeFromCart, navigate, settings, requestCheckoutAccess } = useApp()
   const shipping = cart.reduce((sum, item) => sum + (Number(item.shipping) || 0) * item.qty, 0)
-  const bill = calculateBill(cart, shipping)
+  const bill = calculateBill(cart, shipping, promoCode)
   return (
     <Sheet open={cartOpen} onOpenChange={setCartOpen}>
       <SheetContent side="right" className="w-[92vw] sm:w-[440px] bg-background flex flex-col">
@@ -662,6 +692,7 @@ const CartDrawer = memo(function CartDrawer() {
               ))}
             </div>
             <div className="border-t border-border pt-4 space-y-4">
+              <PromoCodeField subtotal={bill.subtotal} currencySymbol={settings.currencySymbol} />
               <div className="flex justify-between text-sm"><span className="tracking-editorial uppercase text-xs">Subtotal</span><span>{money(bill.subtotal, settings.currencySymbol)}</span></div>
               {bill.discountEligible && <div className="flex justify-between text-sm text-accent"><span>{getBillDiscountLabel(cart)}</span><span>-{money(bill.discount, settings.currencySymbol)}</span></div>}
               <div className="flex justify-between text-sm"><span className="tracking-editorial uppercase text-xs">Shipping</span><span className={shipping === 0 ? 'text-accent tracking-editorial text-xs' : ''}>{shipping === 0 ? 'COMPLIMENTARY SHIPPING' : money(shipping, settings.currencySymbol)}</span></div>
@@ -674,6 +705,47 @@ const CartDrawer = memo(function CartDrawer() {
     </Sheet>
   )
 })
+
+function PromoCodeField({ subtotal, currencySymbol }) {
+  const { promoCode, setPromoCode } = useApp()
+  const [code, setCode] = useState(promoCode)
+  const [error, setError] = useState('')
+  const normalizedCode = code.trim().toUpperCase()
+
+  useEffect(() => {
+    if (promoCode) setCode(promoCode)
+  }, [promoCode])
+
+  const apply = () => {
+    if (normalizedCode !== PROMO_CODE) {
+      setPromoCode('')
+      setError('Enter a valid promo code.')
+      return
+    }
+    setPromoCode(PROMO_CODE)
+    setError('')
+  }
+
+  const remove = () => {
+    setPromoCode('')
+    setCode('')
+    setError('')
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="flex gap-2">
+        <Input aria-label="Promo code" placeholder="Enter promo code" className="h-10 rounded-none uppercase" value={code} onChange={event => { setCode(event.target.value); setError('') }} />
+        <Button type="button" variant="outline" className="h-10 shrink-0 rounded-none px-4 text-xs uppercase tracking-editorial" onClick={promoCode === normalizedCode && promoCode ? remove : apply}>
+          {promoCode === normalizedCode && promoCode ? 'Remove' : 'Apply'}
+        </Button>
+      </div>
+      {promoCode === PROMO_CODE
+        ? <p className="text-xs text-accent">{subtotal > PROMO_MINIMUM_SUBTOTAL ? 'YASH15 applied: 15% off.' : `Code saved. Add ${money(PROMO_MINIMUM_SUBTOTAL - subtotal + 1, currencySymbol)} to qualify.`}</p>
+        : error && <p className="text-xs text-red-600">{error}</p>}
+    </div>
+  )
+}
 
 // ---------- Home ----------
 const DEFAULT_HOME_ORDER = ['hero', 'brand-worlds', 'collections', 'featured', 'lookbook', 'about', 'concierge-cta', 'feedback']
@@ -1384,9 +1456,9 @@ function InquiryDialog({ open, onOpenChange, productId, productName }) {
 
 // ---------- Cart ----------
 function CartView() {
-  const { cart, updateQty, removeFromCart, navigate, settings, requestCheckoutAccess } = useApp()
+  const { cart, promoCode, updateQty, removeFromCart, navigate, settings, requestCheckoutAccess } = useApp()
   const shipping = cart.reduce((sum, item) => sum + (Number(item.shipping) || 0) * item.qty, 0)
-  const bill = calculateBill(cart, shipping)
+  const bill = calculateBill(cart, shipping, promoCode)
   return (
     <div className="max-w-4xl mx-auto px-4 md:px-8 py-16">
       <h1 className="font-serif text-5xl mb-10 text-center">Your Bag</h1>
@@ -1416,6 +1488,7 @@ function CartView() {
           </div>
           <div className="mt-12 flex justify-end">
             <div className="w-full md:w-96 space-y-4">
+              <PromoCodeField subtotal={bill.subtotal} currencySymbol={settings.currencySymbol} />
               <div className="flex justify-between"><span className="tracking-editorial uppercase text-xs">Subtotal</span><span>{money(bill.subtotal, settings.currencySymbol)}</span></div>
               {bill.discountEligible && <div className="flex justify-between text-accent"><span>{getBillDiscountLabel(cart)}</span><span>-{money(bill.discount, settings.currencySymbol)}</span></div>}
               <div className="flex justify-between"><span className="tracking-editorial uppercase text-xs">Shipping</span><span className={shipping === 0 ? 'text-accent tracking-editorial text-xs' : ''}>{shipping === 0 ? 'COMPLIMENTARY SHIPPING' : money(shipping, settings.currencySymbol)}</span></div>
@@ -1431,7 +1504,7 @@ function CartView() {
 
 // ---------- Checkout ----------
 function CheckoutView() {
-  const { cart, user, settings, api, navigate, clearCart, requestCheckoutAccess } = useApp()
+  const { cart, promoCode, user, settings, api, navigate, clearCart, requestCheckoutAccess } = useApp()
   const [form, setForm] = useState({
     customerName: user?.name || '', customerEmail: user?.email || '', customerPhone: '',
     line1: '', line2: '', city: '', state: '', pincode: '', country: 'India', notes: ''
@@ -1439,7 +1512,7 @@ function CheckoutView() {
   const [submitting, setSubmitting] = useState(false)
   const [submitAttempted, setSubmitAttempted] = useState(false)
   const shipping = cart.reduce((sum, item) => sum + (Number(item.shipping) || 0) * item.qty, 0)
-  const bill = calculateBill(cart, shipping)
+  const bill = calculateBill(cart, shipping, promoCode)
   const validation = useMemo(() => validateCheckoutForm(form), [form])
   const errors = submitAttempted ? validation.errors : {}
 
@@ -1464,7 +1537,7 @@ function CheckoutView() {
       const r = await api('/orders', {
         method: 'POST', body: {
           customerName: form.customerName, customerEmail: form.customerEmail, customerPhone: form.customerPhone,
-          items: cart, ...bill,
+          items: cart, promoCode, ...bill,
           shippingAddress: { line1: form.line1, line2: form.line2, city: form.city, state: form.state, pincode: form.pincode, country: form.country },
           notes: form.notes,
         }
@@ -1539,6 +1612,7 @@ function CheckoutView() {
             ))}
           </div>
           <div className="pt-6 space-y-2 text-sm">
+            <PromoCodeField subtotal={bill.subtotal} currencySymbol={settings.currencySymbol} />
             <div className="flex justify-between"><span>Subtotal</span><span>{money(bill.subtotal, settings.currencySymbol)}</span></div>
             {bill.discountEligible && <div className="flex justify-between text-accent"><span>{getBillDiscountLabel(cart)}</span><span>-{money(bill.discount, settings.currencySymbol)}</span></div>}
             <div className="flex justify-between"><span>Shipping</span><span className={shipping === 0 ? 'text-accent tracking-editorial text-xs' : ''}>{shipping === 0 ? 'COMPLIMENTARY SHIPPING' : money(shipping, settings.currencySymbol)}</span></div>
@@ -2384,10 +2458,10 @@ function AdminOrders() {
               <div className="text-[11px] tracking-editorial uppercase text-muted-foreground mb-2">Items</div>
               {editing.items?.map(it => <div key={it.key} className="text-sm">{it.name} · {it.color} · {it.size} · x{it.qty} — {money(it.price * it.qty, settings.currencySymbol)}</div>)}
               <div className="mt-4 space-y-1 text-sm">
-                <div className="flex justify-between"><span>Subtotal</span><span>{money(calculateBill(editing.items, editing.shipping).subtotal, settings.currencySymbol)}</span></div>
-                {calculateBill(editing.items, editing.shipping).discountEligible && <div className="flex justify-between text-accent"><span>{getBillDiscountLabel(editing.items)}</span><span>-{money(calculateBill(editing.items, editing.shipping).discount, settings.currencySymbol)}</span></div>}
+                <div className="flex justify-between"><span>Subtotal</span><span>{money(calculateBill(editing.items, editing.shipping, editing.promoCode).subtotal, settings.currencySymbol)}</span></div>
+                {calculateBill(editing.items, editing.shipping, editing.promoCode).discountEligible && <div className="flex justify-between text-accent"><span>{getBillDiscountLabel(editing.items)}</span><span>-{money(calculateBill(editing.items, editing.shipping, editing.promoCode).discount, settings.currencySymbol)}</span></div>}
                 <div className="flex justify-between"><span>Shipping</span><span>{money(editing.shipping, settings.currencySymbol)}</span></div>
-                <div className="flex justify-between font-medium border-t border-border pt-2"><span>Amount to collect</span><span>{money(calculateBill(editing.items, editing.shipping).total, settings.currencySymbol)}</span></div>
+                <div className="flex justify-between font-medium border-t border-border pt-2"><span>Amount to collect</span><span>{money(calculateBill(editing.items, editing.shipping, editing.promoCode).total, settings.currencySymbol)}</span></div>
               </div>
             </div>
             <Select value={editing.status} onValueChange={v => setEditing({ ...editing, status: v })}>

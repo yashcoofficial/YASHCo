@@ -4,7 +4,7 @@ import crypto from 'crypto'
 import nodemailer from 'nodemailer'
 import { v4 as uuidv4 } from 'uuid'
 import { DEFAULT_NAV_ITEMS } from '../../../lib/navigation.js'
-import { calculateBill, getOfferPrice } from '../../../lib/billing-utils.mjs'
+import { calculateBill, getOfferPrice, PROMO_CODE } from '../../../lib/billing-utils.mjs'
 
 // ---------- DB ----------
 let clientPromise
@@ -646,7 +646,8 @@ async function route(req, method, segments) {
       })
       if (orderItems.some(item => !item)) return json({ error: 'One or more products are unavailable' }, 400)
       const shipping = orderItems.reduce((sum, item) => sum + item.shipping * item.qty, 0)
-      const bill = calculateBill(orderItems, shipping)
+      const promoCode = String(body.promoCode || '').trim().toUpperCase() === PROMO_CODE ? PROMO_CODE : ''
+      const bill = calculateBill(orderItems, shipping, promoCode)
       const doc = {
         id: uuidv4(),
         orderNumber: 'YSH' + Date.now().toString().slice(-8),
@@ -655,6 +656,7 @@ async function route(req, method, segments) {
         customerEmail: body.customerEmail || user?.email || '',
         customerPhone: body.customerPhone || '',
         items: orderItems,
+        promoCode: bill.discountEligible ? PROMO_CODE : '',
         subtotal: bill.subtotal,
         discount: bill.discount,
         shipping: bill.shipping,

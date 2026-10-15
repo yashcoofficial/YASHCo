@@ -30,12 +30,25 @@ test('applies no T-shirt offer and keeps totals unchanged', async () => {
   })
 })
 
-test('does not apply any promotional discount thresholds', async () => {
+test('YASH15 requires a valid code and subtotal above 4999', async () => {
   const { calculateBill } = await import('../lib/billing-utils.mjs')
 
-  assert.equal(calculateBill([{ price: 2200, qty: 1 }]).discount, 0)
-  assert.equal(calculateBill([{ price: 1100, qty: 2 }]).total, 2200)
-  assert.equal(calculateBill([{ price: 2500, qty: 1 }]).discountEligible, false)
+  assert.equal(calculateBill([{ price: 5000, qty: 1 }], 0).discount, 0)
+  assert.equal(calculateBill([{ price: 4999, qty: 1 }], 0, 'YASH15').discountEligible, false)
+  assert.equal(calculateBill([{ price: 5000, qty: 1 }], 0, 'OTHER15').discountEligible, false)
+})
+
+test('YASH15 discounts merchandise subtotal and preserves shipping', async () => {
+  const { calculateBill } = await import('../lib/billing-utils.mjs')
+  const bill = calculateBill([{ price: 5000, qty: 1 }], 120, ' yash15 ')
+
+  assert.deepEqual(bill, {
+    subtotal: 5000,
+    discount: 750,
+    shipping: 120,
+    total: 4370,
+    discountEligible: true,
+  })
 })
 
 test('uses offer prices in the subtotal and calculates the percent off', async () => {
