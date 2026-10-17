@@ -390,6 +390,7 @@ async function route(req, method, segments) {
       const resetTokenHash = createTokenHash(resetToken)
       const origin = process.env.APP_URL || `https://${req.headers.get('host') || 'localhost:3000'}`
       const resetUrl = `${origin}/reset?token=${encodeURIComponent(resetToken)}`
+      await database.collection('resetTokens').deleteMany({ userId: user.id })
       await database.collection('resetTokens').insertOne({ tokenHash: resetTokenHash, userId: user.id, createdAt: new Date(), expiresAt: new Date(Date.now() + 1000*60*30) })
       await sendEmail({
         to: user.email,
@@ -402,6 +403,8 @@ async function route(req, method, segments) {
     }
     if (action === 'reset' && method === 'POST') {
       const { token: rt, newPassword } = await parseBody(req)
+      if (typeof rt !== 'string' || !rt.trim()) return json({ error: 'Reset token required' }, 400)
+      if (typeof newPassword !== 'string' || newPassword.length < 8) return json({ error: 'Password must be at least 8 characters' }, 400)
       const resetTokenHash = createTokenHash(rt)
       const record = await database.collection('resetTokens').findOne({ tokenHash: resetTokenHash })
       if (!record) return json({ error: 'Invalid or expired token' }, 400)

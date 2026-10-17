@@ -1765,8 +1765,7 @@ function ForgotView() {
         {sent && (
           <div className="text-xs bg-muted/40 p-4 border border-border space-y-3">
             <div className="tracking-editorial uppercase text-accent">Email sent</div>
-            <div className="text-sm text-muted-foreground">Please check your inbox for a secure link to continue. If it doesn’t arrive within a couple of minutes, try again.</div>
-            <Button variant="outline" className="rounded-none w-full" onClick={() => navigate('reset')}>Continue to reset form →</Button>
+            <div className="text-sm text-muted-foreground">Please open the secure link in your inbox to set a new password. The link expires after 30 minutes. If it doesn’t arrive within a couple of minutes, try again.</div>
           </div>
         )}
         <div className="text-xs text-center"><button className="underline" onClick={() => navigate('login')}>Back to sign in</button></div>
@@ -1786,6 +1785,8 @@ function ResetView() {
     if (token) setForm(prev => ({ ...prev, token }))
   }, [])
   const submit = async () => {
+    if (!form.token.trim()) { toast.error('Open the reset link from your email or enter your reset code.'); return }
+    if (form.newPassword.length < 8) { toast.error('Your new password must be at least 8 characters.'); return }
     setLoading(true)
     try { await api('/auth/reset', { method: 'POST', body: form }); toast.success('Password reset. Please sign in.'); navigate('login') }
     catch (e) { toast.error(e.message) }
@@ -1795,8 +1796,8 @@ function ResetView() {
     <AuthLayout title="Set New Password" sub="Use the secure link from your email to continue">
       <div className="space-y-4">
         <Input placeholder="Reset Token (paste)" className="rounded-none h-12 font-mono text-xs" value={form.token} onChange={e => setForm({ ...form, token: e.target.value })} />
-        <Input type="password" placeholder="New Password" className="rounded-none h-12" value={form.newPassword} onChange={e => setForm({ ...form, newPassword: e.target.value })} />
-        <Button disabled={loading} className="w-full rounded-none h-12 tracking-editorial uppercase text-xs" onClick={submit}>{loading ? 'Resetting…' : 'Reset Password'}</Button>
+        <Input type="password" placeholder="New Password (at least 8 characters)" className="rounded-none h-12" value={form.newPassword} onChange={e => setForm({ ...form, newPassword: e.target.value })} />
+        <Button disabled={loading || !form.token.trim() || form.newPassword.length < 8} className="w-full rounded-none h-12 tracking-editorial uppercase text-xs" onClick={submit}>{loading ? 'Resetting…' : 'Reset Password'}</Button>
       </div>
     </AuthLayout>
   )
