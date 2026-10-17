@@ -234,7 +234,7 @@ export default function App() {
   useEffect(() => { localStorage.setItem('yash_cart', JSON.stringify(cart)) }, [cart])
 
   useEffect(() => {
-    if (view.name !== 'home' || sessionStorage.getItem('yash15_welcome_seen')) return
+    if (!['home', 'dashboard'].includes(view.name) || sessionStorage.getItem('yash15_welcome_seen')) return
     sessionStorage.setItem('yash15_welcome_seen', 'true')
     setPromoPopupOpen(true)
   }, [view.name])
@@ -432,12 +432,12 @@ function WelcomePromoDialog({ open, onOpenChange }) {
       <DialogContent className="w-[calc(100%-2rem)] max-w-md rounded-none border border-accent bg-background p-8 text-foreground sm:p-10">
         <div className="text-[10px] uppercase tracking-[0.24em] text-accent">A welcome from YASH</div>
         <DialogHeader className="items-center text-center">
-          <DialogTitle className="font-serif text-5xl font-normal">15% off</DialogTitle>
+          <DialogTitle className="font-serif text-4xl font-normal">Get 15% Off</DialogTitle>
         </DialogHeader>
-        <DialogDescription className="text-center text-sm leading-relaxed text-white/75">Enjoy 15% off orders above ₹4,999 with your first-visit code.</DialogDescription>
+        <DialogDescription className="text-center text-sm leading-relaxed text-muted-foreground">On orders above ₹4,999.</DialogDescription>
         <div className="border border-dashed border-accent/70 py-4 text-center font-serif text-2xl tracking-[0.18em]">{PROMO_CODE}</div>
-        <Button className="h-12 w-full rounded-none bg-accent text-xs uppercase tracking-editorial text-accent-foreground hover:bg-accent/90" onClick={() => { onOpenChange(false); navigate('shop') }}>
-          Shop the collection <ArrowRight className="ml-2 h-4 w-4" />
+        <Button className="h-12 w-full rounded-none bg-accent text-xs uppercase tracking-editorial text-accent-foreground hover:bg-accent/90" onClick={() => { onOpenChange(false); navigate('login') }}>
+          Sign In or Create Account <ArrowRight className="ml-2 h-4 w-4" />
         </Button>
       </DialogContent>
     </Dialog>
