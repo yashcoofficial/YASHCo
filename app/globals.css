@@ -4,39 +4,39 @@
 
 @layer base {
   :root {
-    --background: 40 33% 97%;
-    --foreground: 20 14% 8%;
-    --card: 0 0% 100%;
-    --card-foreground: 20 14% 8%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 20 14% 8%;
-    --primary: 20 14% 8%;
-    --primary-foreground: 40 33% 97%;
-    --secondary: 35 20% 92%;
-    --secondary-foreground: 20 14% 8%;
-    --muted: 35 18% 93%;
-    --muted-foreground: 25 8% 40%;
-    --accent: 38 45% 55%;
-    --accent-foreground: 20 14% 8%;
+    --background: 40 33.3333% 94.7059%;
+    --foreground: 60 4.5455% 8.6275%;
+    --card: 40 33.3333% 94.7059%;
+    --card-foreground: 60 4.5455% 8.6275%;
+    --popover: 40 33.3333% 94.7059%;
+    --popover-foreground: 60 4.5455% 8.6275%;
+    --primary: 60 4.5455% 8.6275%;
+    --primary-foreground: 40 33.3333% 94.7059%;
+    --secondary: 35.5556 26.2136% 79.8039%;
+    --secondary-foreground: 60 4.5455% 8.6275%;
+    --muted: 35.5556 26.2136% 79.8039%;
+    --muted-foreground: 80 2.6549% 22.1569%;
+    --accent: 37.0588 31.1927% 57.2549%;
+    --accent-foreground: 60 4.5455% 8.6275%;
     --destructive: 0 60% 45%;
     --destructive-foreground: 40 33% 97%;
-    --border: 30 18% 85%;
-    --input: 30 18% 85%;
-    --ring: 38 45% 55%;
-    --chart-1: 38 45% 55%;
-    --chart-2: 20 14% 20%;
-    --chart-3: 30 20% 60%;
-    --chart-4: 45 60% 65%;
-    --chart-5: 25 10% 40%;
+    --border: 35.5556 26.2136% 79.8039%;
+    --input: 35.5556 26.2136% 79.8039%;
+    --ring: 37.0588 31.1927% 57.2549%;
+    --chart-1: 37.0588 31.1927% 57.2549%;
+    --chart-2: 23.4783 19.6581% 22.9412%;
+    --chart-3: 35.5556 26.2136% 79.8039%;
+    --chart-4: 80 2.6549% 22.1569%;
+    --chart-5: 60 4.5455% 8.6275%;
     --radius: 0.125rem;
-    --sidebar-background: 40 33% 97%;
-    --sidebar-foreground: 20 14% 8%;
-    --sidebar-primary: 20 14% 8%;
-    --sidebar-primary-foreground: 40 33% 97%;
-    --sidebar-accent: 35 20% 92%;
-    --sidebar-accent-foreground: 20 14% 8%;
-    --sidebar-border: 30 18% 85%;
-    --sidebar-ring: 38 45% 55%;
+    --sidebar-background: 40 33.3333% 94.7059%;
+    --sidebar-foreground: 60 4.5455% 8.6275%;
+    --sidebar-primary: 60 4.5455% 8.6275%;
+    --sidebar-primary-foreground: 40 33.3333% 94.7059%;
+    --sidebar-accent: 35.5556 26.2136% 79.8039%;
+    --sidebar-accent-foreground: 60 4.5455% 8.6275%;
+    --sidebar-border: 35.5556 26.2136% 79.8039%;
+    --sidebar-ring: 37.0588 31.1927% 57.2549%;
   }
 }
 

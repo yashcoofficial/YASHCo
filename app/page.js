@@ -21,7 +21,7 @@ import {
 } from 'lucide-react'
 import { buildRouteForView, getBoutiqueNavItems, getVisibleNavItems, resolveViewFromPath } from '@/lib/navigation'
 import { validateCheckoutForm } from '@/lib/checkout-utils.mjs'
-import { calculateBill, getDiscountPercentage, getOfferPrice, PROMO_CODE, PROMO_MINIMUM_SUBTOTAL } from '@/lib/billing-utils.mjs'
+import { calculateBill, getDiscountPercentage, getOfferPrice, PROMO_CODE, PROMO_MINIMUM_SUBTOTAL, ROHAN_CODE } from '@/lib/billing-utils.mjs'
 import { resolveColorValue, getColorSwatches } from '@/lib/color-utils.mjs'
 import { getStockStatusText } from '@/lib/stock-utils'
 
@@ -65,7 +65,7 @@ function hasTshirtItem(items = []) {
 }
 
 function getBillDiscountLabel(items = []) {
-  return `Promo code ${PROMO_CODE} (15% off)`
+  return 'Promo code discount'
 }
 
 function getBillOfferNote(items = []) {
@@ -429,14 +429,14 @@ function WelcomePromoDialog({ open, onOpenChange }) {
   const { navigate } = useApp()
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[calc(100%-2rem)] max-w-md rounded-none border border-[#b89b6a] bg-[#222824] p-8 text-[#f8f4ed] sm:p-10">
-        <div className="text-[10px] uppercase tracking-[0.24em] text-[#d1b887]">A welcome from YASH</div>
+      <DialogContent className="w-[calc(100%-2rem)] max-w-md rounded-none border border-accent bg-background p-8 text-foreground sm:p-10">
+        <div className="text-[10px] uppercase tracking-[0.24em] text-accent">A welcome from YASH</div>
         <DialogHeader className="items-center text-center">
           <DialogTitle className="font-serif text-5xl font-normal">15% off</DialogTitle>
         </DialogHeader>
         <DialogDescription className="text-center text-sm leading-relaxed text-white/75">Enjoy 15% off orders above ₹4,999 with your first-visit code.</DialogDescription>
-        <div className="border border-dashed border-[#b89b6a]/70 py-4 text-center font-serif text-2xl tracking-[0.18em]">{PROMO_CODE}</div>
-        <Button className="h-12 w-full rounded-none bg-[#d1b887] text-xs uppercase tracking-editorial text-[#222824] hover:bg-[#e0cca3]" onClick={() => { onOpenChange(false); navigate('shop') }}>
+        <div className="border border-dashed border-accent/70 py-4 text-center font-serif text-2xl tracking-[0.18em]">{PROMO_CODE}</div>
+        <Button className="h-12 w-full rounded-none bg-accent text-xs uppercase tracking-editorial text-accent-foreground hover:bg-accent/90" onClick={() => { onOpenChange(false); navigate('shop') }}>
           Shop the collection <ArrowRight className="ml-2 h-4 w-4" />
         </Button>
       </DialogContent>
@@ -717,7 +717,7 @@ function PromoCodeField({ subtotal, currencySymbol }) {
   }, [promoCode])
 
   const apply = () => {
-    if (normalizedCode !== PROMO_CODE) {
+    if (![PROMO_CODE, ROHAN_CODE].includes(normalizedCode)) {
       setPromoCode('')
       setError('Enter a valid promo code.')
       return
@@ -742,7 +742,9 @@ function PromoCodeField({ subtotal, currencySymbol }) {
       </div>
       {promoCode === PROMO_CODE
         ? <p className="text-xs text-accent">{subtotal > PROMO_MINIMUM_SUBTOTAL ? 'YASH15 applied: 15% off.' : `Code saved. Add ${money(PROMO_MINIMUM_SUBTOTAL - subtotal + 1, currencySymbol)} to qualify.`}</p>
-        : error && <p className="text-xs text-red-600">{error}</p>}
+        : promoCode === ROHAN_CODE
+          ? <p className="text-xs text-accent">20% discount applied to your products.</p>
+          : error && <p className="text-xs text-red-600">{error}</p>}
     </div>
   )
 }

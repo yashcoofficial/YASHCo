@@ -51,6 +51,31 @@ test('YASH15 discounts merchandise subtotal and preserves shipping', async () =>
   })
 })
 
+test('ROHAN applies 20% to each product without a minimum order', async () => {
+  const { calculateBill } = await import('../lib/billing-utils.mjs')
+  const bill = calculateBill([
+    { price: 1200, qty: 2 },
+    { price: 1000, salePrice: 800, qty: 1 },
+  ], 150, ' rohan20 ')
+
+  assert.deepEqual(bill, {
+    subtotal: 3200,
+    discount: 640,
+    shipping: 150,
+    total: 2710,
+    discountEligible: true,
+  })
+})
+
+test('rejects combined or unknown coupon codes', async () => {
+  const { calculateBill } = await import('../lib/billing-utils.mjs')
+  const items = [{ price: 6000, qty: 1 }]
+
+  assert.equal(calculateBill(items, 0, 'YASH15 ROHAN20').discountEligible, false)
+  assert.equal(calculateBill(items, 0, 'ROHAN').discountEligible, false)
+  assert.equal(calculateBill(items, 0, 'UNKNOWN').discount, 0)
+})
+
 test('uses offer prices in the subtotal and calculates the percent off', async () => {
   const { calculateBill, getDiscountPercentage } = await import('../lib/billing-utils.mjs')
   const product = { price: 2000, salePrice: 1500, qty: 2 }
