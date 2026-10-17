@@ -388,7 +388,7 @@ async function route(req, method, segments) {
       if (!user) return json({ ok: true, message: 'If the account exists, a reset link has been sent.' })
       const resetToken = crypto.randomBytes(24).toString('hex')
       const resetTokenHash = createTokenHash(resetToken)
-      const origin = process.env.APP_URL || `https://${req.headers.get('host') || 'localhost:3000'}`
+      const origin = (process.env.APP_URL || new URL(req.url).origin).replace(/\/+$/, '')
       const resetUrl = `${origin}/reset?token=${encodeURIComponent(resetToken)}`
       await database.collection('resetTokens').deleteMany({ userId: user.id })
       await database.collection('resetTokens').insertOne({ tokenHash: resetTokenHash, userId: user.id, createdAt: new Date(), expiresAt: new Date(Date.now() + 1000*60*30) })
