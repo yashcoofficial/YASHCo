@@ -1939,10 +1939,10 @@ function ConciergeView() {
 function AboutView() {
   const { settings } = useApp()
   return (
-    <div className="max-w-3xl mx-auto py-24 px-6 text-center">
+    <div className="max-w-3xl mx-auto py-24 px-6 text-left">
       <div className="text-[11px] tracking-luxe uppercase text-accent mb-6">Maison</div>
       <h1 className="font-serif text-5xl mb-6">{settings.aboutTitle}</h1>
-      <div className="divider-gold mx-auto w-32 mb-8" />
+      <div className="divider-gold w-32 mb-8" />
       <p className="whitespace-pre-line text-muted-foreground leading-relaxed">{settings.aboutBody}</p>
     </div>
   )
