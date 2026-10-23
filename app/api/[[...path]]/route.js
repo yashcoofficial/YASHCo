@@ -261,6 +261,7 @@ async function seedIfNeeded() {
     { name: 'T-Shirts', slug: 'menswear-t-shirts', image: '', description: 'Refined everyday jersey essentials.', order: 3, parentSlug: 'menswear' },
     { name: 'Men', slug: 'accessories-men', image: '', description: 'Finishing pieces for the modern man.', order: 1, parentSlug: 'accessories' },
     { name: 'Women', slug: 'accessories-women', image: '', description: 'Finishing pieces for the modern woman.', order: 2, parentSlug: 'accessories' },
+    { name: 'Perfume', slug: 'perfume', image: '', description: 'Signature fragrances from the House of YASH.', order: 4, parentSlug: null },
   ]
 
   for (const collection of requiredCollections) {

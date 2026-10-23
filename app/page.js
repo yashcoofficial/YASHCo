@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useMemo, useState, useCallback, createContext, useContext, memo } from 'react'
+import { useEffect, useMemo, useState, useCallback, useRef, createContext, useContext, memo } from 'react'
 import { Toaster, toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -17,7 +17,8 @@ import {
   ShoppingBag, Heart, User, Search, Menu, X, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Plus, Minus,
   Trash2, LogOut, Edit3, Package, Mail, MessageCircle, Settings as SettingsIcon,
   Truck, Star, Filter, Check, ArrowRight, Instagram, Facebook, Twitter,
-  GripVertical, Eye, EyeOff, Download, ZoomIn,
+  GripVertical, Eye, EyeOff, Download, ZoomIn, Bold, Italic, Underline as UnderlineIcon,
+  Strikethrough, List, ListOrdered, Heading2, Heading3,
 } from 'lucide-react'
 import { buildRouteForView, getBoutiqueNavItems, getVisibleNavItems, resolveViewFromPath } from '@/lib/navigation'
 import { validateCheckoutForm } from '@/lib/checkout-utils.mjs'
@@ -403,6 +404,7 @@ export default function App() {
       <main className="min-h-[70vh]">
         {view.name === 'home' && <HomeView />}
         {view.name === 'shop' && <ShopView />}
+        {view.name === 'perfume' && <ShopView />}
         {view.name === 'product' && <ProductView />}
         {view.name === 'cart' && <CartView />}
         {view.name === 'checkout' && <CheckoutView />}
@@ -765,7 +767,7 @@ function HomeView() {
 
   // Style helpers
   const heroH = settings.heroHeight || '100vh'
-  const heroAlign = settings.heroTextAlign || 'center'
+  const heroAlign = settings.heroTextAlign || 'left'
   const heroVPos = settings.heroTextPosition || 'bottom'
   const heroOverlay = parseFloat(settings.heroOverlay ?? 0.4)
   const heroSize = settings.heroTitleSize || 'xl'
@@ -820,13 +822,13 @@ function HomeView() {
             heroVPos === 'top' && 'justify-start pt-20 sm:pt-32',
           )}>
             <div className="text-white/80 text-[11px] tracking-luxe uppercase mb-4 sm:mb-6">{settings.heroEyebrow || 'Season 01 — Nocturne'}</div>
-            <h1 className={cx('hero-title font-serif text-white leading-[0.95] font-light max-w-full break-words',
+            <div role="heading" aria-level={1} className={cx('hero-title font-serif text-white leading-[0.95] font-light max-w-full break-words',
               heroSize === 'xl' && 'text-4xl sm:text-6xl md:text-8xl lg:text-9xl',
               heroSize === 'lg' && 'text-4xl sm:text-5xl md:text-7xl lg:text-8xl',
               heroSize === 'md' && 'text-3xl sm:text-4xl md:text-6xl lg:text-7xl',
               heroSize === 'sm' && 'text-3xl sm:text-4xl md:text-5xl lg:text-6xl',
-            )}>{settings.heroTitle}</h1>
-            <p className="hero-subtitle whitespace-pre-line text-white/85 mt-4 sm:mt-6 max-w-[min(100%,36rem)] text-sm md:text-base leading-relaxed">{settings.heroSubtitle}</p>
+            )}><RichTextContent value={settings.heroTitle} /></div>
+            <div className="hero-subtitle text-white/85 mt-4 sm:mt-6 max-w-[min(100%,36rem)] text-sm md:text-base leading-relaxed"><RichTextContent value={settings.heroSubtitle} /></div>
             <Button onClick={() => navigate('shop')} className="hero-cta mt-8 sm:mt-10 rounded-none bg-white text-black hover:bg-white/90 h-12 px-6 sm:px-10 tracking-editorial uppercase text-xs max-w-full whitespace-nowrap">{settings.heroCtaLabel || 'Discover the Collection'}</Button>
           </div>
         </section>
@@ -954,10 +956,10 @@ function HomeView() {
           aboutBg === 'dark' ? 'bg-primary text-primary-foreground' : 'bg-muted/40',
           aboutPad === 'sm' && 'py-12 md:py-16', aboutPad === 'md' && 'py-24 md:py-32', aboutPad === 'lg' && 'py-32 md:py-44',
         )}>
-          <div className="max-w-3xl mx-auto text-center px-6">
+          <div className="max-w-3xl mx-auto text-left px-6">
             <div className="text-[11px] tracking-luxe uppercase text-accent mb-6">{settings.aboutEyebrow || 'Maison'}</div>
             <h2 className="font-serif text-4xl md:text-5xl mb-8">{settings.aboutTitle}</h2>
-            <div className="divider-gold mx-auto w-32 mb-8" />
+            <div className="divider-gold w-32 mb-8" />
             <p className={cx('whitespace-pre-line leading-relaxed', aboutBg === 'dark' ? 'text-primary-foreground/80' : 'text-muted-foreground')}>{settings.aboutBody}</p>
           </div>
         </section>
@@ -1035,9 +1037,9 @@ function PageSection({ section }) {
 
   if (section.type === 'core-shop') return (
     <div className="max-w-[1400px] mx-auto px-4 md:px-8 py-12 md:py-20 pointer-events-none opacity-90">
-      <div className="text-center mb-12">
-        <div className="text-[11px] tracking-luxe uppercase text-accent mb-4">{section.content?.eyebrow || 'The Boutique'}</div>
-        <h1 className="font-serif text-5xl md:text-6xl">{section.content?.title || 'Shop All'}</h1>
+      <div className={cx('mb-12', section.style?.textAlign === 'center' && 'text-center', section.style?.textAlign === 'right' && 'text-right', section.style?.textAlign !== 'center' && section.style?.textAlign !== 'right' && 'text-left')}>
+        <div className="text-[11px] tracking-luxe uppercase text-accent mb-4"><RichTextContent value={section.content?.eyebrow || 'The Boutique'} /></div>
+        <h1 className="font-serif text-5xl md:text-6xl"><RichTextContent value={section.content?.title || 'Shop All'} /></h1>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-[240px_1fr] gap-8 md:gap-12">
         <aside className="space-y-8 hidden md:block opacity-60">
@@ -1079,19 +1081,81 @@ function PageSection({ section }) {
   return null
 }
 
+function getRichTextHtml(value = '') {
+  const text = String(value || '')
+  const hasFormatting = /<\/?(?:b|strong|i|em|u|s|strike|ul|ol|li|h2|h3|p|div|br|blockquote)\b/i.test(text)
+  const html = hasFormatting ? text : escapeHtml(text).replace(/\r?\n/g, '<br>')
+  return html.replace(/<(\/?)([a-z][a-z0-9]*)(?:\s[^>]*)?>/gi, (tag, closing, name) => {
+    const safeTag = name.toLowerCase()
+    if (!['b', 'strong', 'i', 'em', 'u', 's', 'strike', 'ul', 'ol', 'li', 'h2', 'h3', 'p', 'div', 'br', 'blockquote'].includes(safeTag)) return ''
+    return safeTag === 'br' ? '<br>' : `<${closing ? '/' : ''}${safeTag}>`
+  })
+}
+
+function RichTextContent({ value }) {
+  return <div dangerouslySetInnerHTML={{ __html: getRichTextHtml(value) }} />
+}
+
+function RichTextEditor({ value, onChange, placeholder }) {
+  const editorRef = useRef(null)
+  const html = getRichTextHtml(value)
+
+  useEffect(() => {
+    if (editorRef.current && editorRef.current.innerHTML !== html) editorRef.current.innerHTML = html
+  }, [html])
+
+  const runCommand = (command, commandValue) => {
+    editorRef.current?.focus()
+    document.execCommand(command, false, commandValue)
+    if (editorRef.current) onChange(editorRef.current.innerHTML)
+  }
+  const toolbarButtons = [
+    { label: 'Bold', icon: Bold, command: 'bold' },
+    { label: 'Italic', icon: Italic, command: 'italic' },
+    { label: 'Underline', icon: UnderlineIcon, command: 'underline' },
+    { label: 'Strikethrough', icon: Strikethrough, command: 'strikeThrough' },
+    { label: 'Heading 2', icon: Heading2, command: 'formatBlock', value: 'h2' },
+    { label: 'Heading 3', icon: Heading3, command: 'formatBlock', value: 'h3' },
+    { label: 'Bulleted list', icon: List, command: 'insertUnorderedList' },
+    { label: 'Numbered list', icon: ListOrdered, command: 'insertOrderedList' },
+  ]
+
+  return (
+    <div className="mt-1 border border-border">
+      <div className="flex flex-wrap gap-1 border-b border-border p-1">
+        {toolbarButtons.map(({ label, icon: Icon, command, value: commandValue }) => (
+          <Button key={label} type="button" variant="ghost" size="icon" aria-label={label} title={label} className="h-8 w-8 rounded-none" onMouseDown={event => event.preventDefault()} onClick={() => runCommand(command, commandValue)}>
+            <Icon className="h-4 w-4" />
+          </Button>
+        ))}
+      </div>
+      <div
+        ref={editorRef}
+        contentEditable
+        suppressContentEditableWarning
+        role="textbox"
+        aria-multiline="true"
+        data-placeholder={placeholder}
+        className="min-h-24 px-3 py-2 text-sm outline-none [&_h2]:text-xl [&_h2]:font-serif [&_h3]:text-lg [&_h3]:font-serif [&_ol]:list-decimal [&_ol]:pl-6 [&_ul]:list-disc [&_ul]:pl-6"
+        onInput={event => onChange(event.currentTarget.innerHTML)}
+      />
+    </div>
+  )
+}
+
 function HeroBannerSection({ section }) {
   const { navigate } = useApp()
   const { content = {}, style = {} } = section
   const height = style.height || '50vh'
   const opacity = style.overlayOpacity ?? 0.4
-  const align = style.textAlign || 'center'
+  const align = style.textAlign || 'left'
   return (
     <section className="relative overflow-hidden" style={{ height }}>
       {content.image && <img src={content.image} alt="" className="absolute inset-0 w-full h-full object-cover" />}
       {content.image && <div className="absolute inset-0" style={{ background: `rgba(0,0,0,${opacity})` }} />}
-      <div className={cx('relative z-10 h-full flex flex-col justify-end pb-16 px-8', align === 'center' && 'items-center text-center', align === 'left' && 'items-start', align === 'right' && 'items-end')}>
-        {content.subtitle && <div className="whitespace-pre-line text-white/80 text-[11px] tracking-luxe uppercase mb-4">{content.subtitle}</div>}
-        {content.title && <h2 className="font-serif text-white text-5xl md:text-7xl font-light leading-tight">{content.title}</h2>}
+      <div className={cx('relative z-10 h-full flex flex-col justify-end pb-16 px-8', align === 'center' && 'items-center text-center', align === 'left' && 'items-start text-left', align === 'right' && 'items-end text-right')}>
+        {content.subtitle && <div className="text-white/80 text-[11px] tracking-luxe uppercase mb-4"><RichTextContent value={content.subtitle} /></div>}
+        {content.title && <h2 className="font-serif text-white text-5xl md:text-7xl font-light leading-tight"><RichTextContent value={content.title} /></h2>}
         {content.ctaLabel && (
           <button onClick={() => content.ctaAction && navigate(content.ctaAction)} className="mt-8 rounded-none bg-white text-black hover:bg-white/90 h-12 px-10 tracking-editorial uppercase text-xs">{content.ctaLabel}</button>
         )}
@@ -1102,14 +1166,14 @@ function HeroBannerSection({ section }) {
 
 function EditorialTextSection({ section }) {
   const { content = {}, style = {} } = section
-  const align = style.textAlign || 'center'
+  const align = style.textAlign || 'left'
   return (
     <section className="py-20 md:py-28 px-6">
       <div className={cx('max-w-3xl mx-auto', align === 'left' && 'text-left', align === 'right' && 'text-right', align === 'center' && 'text-center')}>
         {content.label && <div className="text-[11px] tracking-luxe uppercase text-accent mb-4">{content.label}</div>}
-        {content.title && <h2 className="font-serif text-4xl md:text-5xl mb-6">{content.title}</h2>}
+        {content.title && <h2 className="font-serif text-4xl md:text-5xl mb-6"><RichTextContent value={content.title} /></h2>}
         {content.title && <div className="divider-gold mx-auto w-32 mb-8" />}
-        {content.body && <p className="whitespace-pre-line text-muted-foreground leading-relaxed text-base">{content.body}</p>}
+        {content.body && <div className="text-muted-foreground leading-relaxed text-base"><RichTextContent value={content.body} /></div>}
       </div>
     </section>
   )
@@ -1137,9 +1201,9 @@ function PromoBannerSection({ section }) {
   const { content = {}, style = {} } = section
   const dark = style.bgColor !== 'light'
   return (
-    <section className={cx('py-16 px-6 text-center', dark ? 'bg-primary text-primary-foreground' : 'bg-muted/40')}>
+    <section className={cx('py-16 px-6', style.textAlign === 'center' && 'text-center', style.textAlign === 'right' && 'text-right', style.textAlign !== 'center' && style.textAlign !== 'right' && 'text-left', dark ? 'bg-primary text-primary-foreground' : 'bg-muted/40')}>
       <div className="max-w-2xl mx-auto">
-        {content.text && <p className={cx('whitespace-pre-line font-serif text-3xl md:text-4xl mb-6', dark && 'text-primary-foreground')}>{content.text}</p>}
+        {content.text && <div className={cx('font-serif text-3xl md:text-4xl mb-6', dark && 'text-primary-foreground')}><RichTextContent value={content.text} /></div>}
         {content.ctaLabel && (
           <button onClick={() => content.ctaAction && navigate(content.ctaAction)}
             className={cx('rounded-none h-12 px-10 tracking-editorial uppercase text-xs border', dark ? 'border-primary-foreground text-primary-foreground hover:bg-primary-foreground hover:text-primary' : 'border-primary text-primary hover:bg-primary hover:text-primary-foreground', 'transition-colors')}>
@@ -1155,7 +1219,7 @@ function PromoBannerSection({ section }) {
 function ShopView() {
   const { api, view, collections, allProducts, settings, navigate } = useApp()
   const [products, setProducts] = useState([])
-  const [filters, setFilters] = useState({ collection: view.params.collection || '', size: '', color: '', minPrice: '', maxPrice: '', search: '', sort: '' })
+  const [filters, setFilters] = useState({ collection: view.name === 'perfume' ? 'perfume' : view.params.collection || '', size: '', color: '', minPrice: '', maxPrice: '', search: '', sort: '' })
   const [loading, setLoading] = useState(true)
   const activeCollection = collections.find(collection => collection.slug === filters.collection)
   const categoryParent = activeCollection?.parentSlug
@@ -1172,8 +1236,8 @@ function ShopView() {
     : allProducts
 
   useEffect(() => {
-    setFilters(prev => ({ ...prev, collection: view.params.collection || '' }))
-  }, [view.params.collection])
+    setFilters(prev => ({ ...prev, collection: view.name === 'perfume' ? 'perfume' : view.params.collection || '' }))
+  }, [view.name, view.params.collection])
 
   useEffect(() => {
     setLoading(true)
@@ -1182,7 +1246,14 @@ function ShopView() {
     api(`/products?${q.toString()}`).then(r => setProducts(r.products)).finally(() => setLoading(false))
   }, [filters, api])
 
-  const pageKey = 'shop'
+  const layoutCollection = activeCollection?.parentSlug
+    ? collections.find(collection => collection.slug === activeCollection.parentSlug)
+    : activeCollection
+  const pageKey = view.name === 'perfume'
+    ? 'perfume'
+    : ['menswear', 'womenswear', 'accessories'].includes(layoutCollection?.slug)
+      ? layoutCollection.slug
+      : 'shop'
   let pageSections = settings.pageLayouts?.[pageKey]?.sections || []
   if (!pageSections.find(s => s.type === 'core-shop')) {
     pageSections = [...pageSections, { id: `core-${pageKey}`, type: 'core-shop', visible: true, order: 999 }]
@@ -1196,9 +1267,9 @@ function ShopView() {
         if (s.type === 'core-shop') {
           return (
             <div key={s.id} className="max-w-[1400px] mx-auto px-4 md:px-8 py-12 md:py-20">
-              <div className="text-center mb-8 fade-in">
-                <div className="text-[11px] tracking-luxe uppercase text-accent mb-4">{s.content?.eyebrow || 'The Boutique'}</div>
-                <h1 className="font-serif text-5xl md:text-6xl uppercase">{activeCollection?.name || s.content?.title || 'Shop All'}</h1>
+              <div className={cx('mb-8 fade-in', s.style?.textAlign === 'center' && 'text-center', s.style?.textAlign === 'right' && 'text-right', s.style?.textAlign !== 'center' && s.style?.textAlign !== 'right' && 'text-left')}>
+                <div className="text-[11px] tracking-luxe uppercase text-accent mb-4"><RichTextContent value={s.content?.eyebrow || 'The Boutique'} /></div>
+                <h1 className="font-serif text-5xl md:text-6xl uppercase"><RichTextContent value={activeCollection?.name || s.content?.title || 'Shop All'} /></h1>
               </div>
               <div className="max-w-xl mx-auto mb-5">
                 <Label className="sr-only" htmlFor="shop-search">Search pieces</Label>
@@ -2727,12 +2798,13 @@ const PAGE_DEFS = [
   { key: 'womenswear', label: 'Women', desc: 'Womenswear collection' },
   { key: 'menswear', label: 'Men', desc: 'Menswear collection' },
   { key: 'accessories', label: 'Accessories', desc: 'Accessories collection' },
+  { key: 'perfume', label: 'Perfume', desc: 'Perfume collection' },
   { key: 'concierge', label: 'Concierge', desc: 'Private concierge page' },
 ]
 
 const DEFAULT_SECTION_CONTENT = {
-  'hero-banner': { content: { label: '', title: '', subtitle: '', image: '', ctaLabel: '', ctaAction: '' }, style: { textAlign: 'center', overlayOpacity: 0.4, height: '50vh' } },
-  'editorial-text': { content: { label: '', title: '', body: '' }, style: { textAlign: 'center' } },
+  'hero-banner': { content: { label: '', title: '', subtitle: '', image: '', ctaLabel: '', ctaAction: '' }, style: { textAlign: 'left', overlayOpacity: 0.4, height: '50vh' } },
+  'editorial-text': { content: { label: '', title: '', body: '' }, style: { textAlign: 'left' } },
   'lookbook-strip': { content: { images: ['', '', ''], offset: true }, style: {} },
   'promo-banner': { content: { text: '', ctaLabel: '', ctaAction: '' }, style: { bgColor: 'dark' } },
 }
@@ -2759,8 +2831,8 @@ const HOME_SECTION_DEFS = [
       { key: 'heroImageMobile', label: 'Mobile Background Image URL', type: 'url', placeholder: 'https://...' },
       { key: 'heroObjectPosition', label: 'Image Focus Position', type: 'text', placeholder: 'center center' },
       { key: 'heroEyebrow', label: 'Season Label / Eyebrow', type: 'text', placeholder: 'Season 01 — Nocturne' },
-      { key: 'heroTitle', label: 'Main Title', type: 'text', placeholder: 'Own Every Moment' },
-      { key: 'heroSubtitle', label: 'Subtitle', type: 'textarea', placeholder: 'A curated house of quiet luxury…' },
+      { key: 'heroTitle', label: 'Main Title', type: 'richtext', placeholder: 'Own Every Moment' },
+      { key: 'heroSubtitle', label: 'Subtitle', type: 'richtext', placeholder: 'A curated house of quiet luxury…' },
       { key: 'heroCtaLabel', label: 'CTA Button Label', type: 'text', placeholder: 'Discover the Collection' },
       {
         key: 'heroHeight', label: 'Banner Height', type: 'select', options: [
@@ -2769,7 +2841,7 @@ const HOME_SECTION_DEFS = [
       },
       {
         key: 'heroTextAlign', label: 'Text Alignment', type: 'select', options: [
-          { value: 'center', label: 'Center' }, { value: 'left', label: 'Left' }, { value: 'right', label: 'Right' },
+          { value: 'left', label: 'Left' }, { value: 'center', label: 'Center' }, { value: 'right', label: 'Right' },
         ]
       },
       {
@@ -2788,10 +2860,10 @@ const HOME_SECTION_DEFS = [
       <div style={{ position: 'relative', height: '160px', overflow: 'hidden', background: '#111' }}>
         {(s.heroImageMobile || s.heroImage) && <img src={s.heroImageMobile || s.heroImage} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: s.heroObjectPosition || 'center center', opacity: 0.55 }} />}
         <div style={{ position: 'absolute', inset: 0, background: `rgba(0,0,0,${s.heroOverlay || 0.4})` }} />
-        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '16px', textAlign: s.heroTextAlign || 'center', color: 'white' }}>
+        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '16px', textAlign: s.heroTextAlign || 'left', color: 'white' }}>
           <div style={{ fontSize: '8px', letterSpacing: '0.3em', textTransform: 'uppercase', opacity: 0.7, marginBottom: '4px' }}>{s.heroEyebrow || 'Season 01 — Nocturne'}</div>
-          <div style={{ fontFamily: 'Georgia,serif', fontSize: '22px', lineHeight: 1.1, fontWeight: 300, marginBottom: '6px' }}>{s.heroTitle || 'Own Every Moment'}</div>
-          <div style={{ fontSize: '8px', opacity: 0.7, marginBottom: '8px', maxWidth: '200px', margin: s.heroTextAlign === 'center' ? '0 auto 8px' : '0 0 8px' }}>{s.heroSubtitle || ''}</div>
+          <div style={{ fontFamily: 'Georgia,serif', fontSize: '22px', lineHeight: 1.1, fontWeight: 300, marginBottom: '6px' }}><RichTextContent value={s.heroTitle || 'Own Every Moment'} /></div>
+          <div style={{ fontSize: '8px', opacity: 0.7, marginBottom: '8px', maxWidth: '200px', margin: s.heroTextAlign === 'center' ? '0 auto 8px' : '0 0 8px' }}><RichTextContent value={s.heroSubtitle || ''} /></div>
           <div style={{ display: 'inline-block', background: 'white', color: '#111', fontSize: '7px', letterSpacing: '0.15em', textTransform: 'uppercase', padding: '5px 14px' }}>{s.heroCtaLabel || 'Discover the Collection'}</div>
         </div>
       </div>
@@ -2960,11 +3032,11 @@ const HOME_SECTION_DEFS = [
       const bg = s.aboutBg === 'light' ? '#f0ebe3' : '#141414'
       const fg = s.aboutBg === 'light' ? '#141414' : '#fff'
       return (
-        <div style={{ background: bg, color: fg, padding: '20px', textAlign: 'center' }}>
+        <div style={{ background: bg, color: fg, padding: '20px', textAlign: 'left' }}>
           <div style={{ fontSize: '8px', color: '#c8a15b', letterSpacing: '0.3em', textTransform: 'uppercase', marginBottom: '6px' }}>{s.aboutEyebrow || 'Maison'}</div>
           <div style={{ fontFamily: 'Georgia,serif', fontSize: '15px', marginBottom: '8px' }}>{s.aboutTitle || 'The House'}</div>
-          <div style={{ width: '40px', height: '1px', background: 'linear-gradient(90deg,transparent,#c8a15b,transparent)', margin: '0 auto 8px' }} />
-          <div style={{ fontSize: '8px', opacity: 0.7, lineHeight: 1.6, maxWidth: '220px', margin: '0 auto' }}>{(s.aboutBody || '').slice(0, 100)}{s.aboutBody?.length > 100 ? '…' : ''}</div>
+          <div style={{ width: '40px', height: '1px', background: 'linear-gradient(90deg,transparent,#c8a15b,transparent)', margin: '0 0 8px' }} />
+          <div style={{ fontSize: '8px', opacity: 0.7, lineHeight: 1.6, maxWidth: '220px' }}>{(s.aboutBody || '').slice(0, 100)}{s.aboutBody?.length > 100 ? '…' : ''}</div>
         </div>
       )
     }
@@ -3100,7 +3172,7 @@ function AdminPageStudio() {
   // ---- LAYOUT PAGE SECTION HANDLERS ----
   const getCurrentSections = useCallback(() => {
     let sects = layouts[selectedPage]?.sections || []
-    const coreType = selectedPage === 'concierge' ? 'core-concierge' : (['shop', 'womenswear', 'menswear', 'accessories'].includes(selectedPage) ? 'core-shop' : null)
+    const coreType = selectedPage === 'concierge' ? 'core-concierge' : (['shop', 'womenswear', 'menswear', 'accessories', 'perfume'].includes(selectedPage) ? 'core-shop' : null)
 
     if (coreType && !sects.find(s => s.type === coreType)) {
       sects = [...sects, { id: `core-${selectedPage}`, type: coreType, visible: true, order: 999 }]
@@ -3374,6 +3446,8 @@ function AdminPageStudio() {
                           <input type="color" value={localSettings[f.key] || f.placeholder || '#000000'} onChange={e => setHomeField(f.key, e.target.value)} className="w-8 h-8 border border-border cursor-pointer rounded-none p-0" />
                           <Input className="rounded-none text-sm h-9 flex-1 font-mono text-xs" value={localSettings[f.key] || ''} onChange={e => setHomeField(f.key, e.target.value)} placeholder={f.placeholder} />
                         </div>
+                      ) : f.type === 'richtext' ? (
+                        <RichTextEditor value={localSettings[f.key] || ''} onChange={value => setHomeField(f.key, value)} placeholder={f.placeholder} />
                       ) : f.type === 'textarea' ? (
                         <Textarea rows={4} className="rounded-none text-sm" value={localSettings[f.key] || ''} onChange={e => setHomeField(f.key, e.target.value)} placeholder={f.placeholder} />
                       ) : f.type === 'textarea-list' ? (
@@ -3451,8 +3525,14 @@ function SectionEditor({ section, onChange }) {
 
   if (section.type === 'core-shop') return (
     <div className="space-y-4">
-      <div><Label>Eyebrow</Label><Input value={c.eyebrow || ''} onChange={e => setContent('eyebrow', e.target.value)} placeholder="The Boutique" /></div>
-      <div><Label>Custom Title (optional)</Label><Input value={c.title || ''} onChange={e => setContent('title', e.target.value)} placeholder="Shop All" /></div>
+      <div><Label>Eyebrow</Label><RichTextEditor value={c.eyebrow || ''} onChange={value => setContent('eyebrow', value)} placeholder="The Boutique" /></div>
+      <div><Label>Custom Title (optional)</Label><RichTextEditor value={c.title || ''} onChange={value => setContent('title', value)} placeholder="Shop All" /></div>
+      <div><Label>Text Align</Label>
+        <Select value={st.textAlign || 'left'} onValueChange={v => setStyle('textAlign', v)}>
+          <SelectTrigger className="mt-1 rounded-none"><SelectValue /></SelectTrigger>
+          <SelectContent><SelectItem value="left">Left</SelectItem><SelectItem value="center">Center</SelectItem><SelectItem value="right">Right</SelectItem></SelectContent>
+        </Select>
+      </div>
       <div><Label>Product Image Aspect Ratio</Label>
         <Select value={c.aspectRatio || '3/4'} onValueChange={v => setContent('aspectRatio', v)}>
           <SelectTrigger className="mt-1 rounded-none"><SelectValue /></SelectTrigger>
@@ -3488,8 +3568,8 @@ function SectionEditor({ section, onChange }) {
           </Select>
         </div>
       </div>
-      <div><Label className="text-xs tracking-editorial uppercase text-muted-foreground">Title</Label><Input className="rounded-none mt-1" value={c.title || ''} onChange={e => setContent('title', e.target.value)} placeholder="Main heading" /></div>
-      <div><Label className="text-xs tracking-editorial uppercase text-muted-foreground">Subtitle</Label><Input className="rounded-none mt-1" value={c.subtitle || ''} onChange={e => setContent('subtitle', e.target.value)} placeholder="Supporting text" /></div>
+      <div><Label className="text-xs tracking-editorial uppercase text-muted-foreground">Title</Label><RichTextEditor value={c.title || ''} onChange={value => setContent('title', value)} placeholder="Main heading" /></div>
+      <div><Label className="text-xs tracking-editorial uppercase text-muted-foreground">Subtitle</Label><RichTextEditor value={c.subtitle || ''} onChange={value => setContent('subtitle', value)} placeholder="Supporting text" /></div>
       <div><Label className="text-xs tracking-editorial uppercase text-muted-foreground">Background Image URL</Label><Input className="rounded-none mt-1" value={c.image || ''} onChange={e => setContent('image', e.target.value)} placeholder="https://..." /></div>
       <div className="grid grid-cols-2 gap-4">
         <div><Label className="text-xs tracking-editorial uppercase text-muted-foreground">CTA Button Label</Label><Input className="rounded-none mt-1" value={c.ctaLabel || ''} onChange={e => setContent('ctaLabel', e.target.value)} placeholder="e.g. Shop Now" /></div>
@@ -3497,7 +3577,7 @@ function SectionEditor({ section, onChange }) {
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div><Label className="text-xs tracking-editorial uppercase text-muted-foreground">Text Align</Label>
-          <Select value={st.textAlign || 'center'} onValueChange={v => setStyle('textAlign', v)}>
+          <Select value={st.textAlign || 'left'} onValueChange={v => setStyle('textAlign', v)}>
             <SelectTrigger className="rounded-none mt-1"><SelectValue /></SelectTrigger>
             <SelectContent><SelectItem value="left">Left</SelectItem><SelectItem value="center">Center</SelectItem><SelectItem value="right">Right</SelectItem></SelectContent>
           </Select>
@@ -3510,10 +3590,10 @@ function SectionEditor({ section, onChange }) {
   if (section.type === 'editorial-text') return (
     <div className="space-y-4 mt-2">
       <div><Label className="text-xs tracking-editorial uppercase text-muted-foreground">Eyebrow Label</Label><Input className="rounded-none mt-1" value={c.label || ''} onChange={e => setContent('label', e.target.value)} placeholder="e.g. Maison" /></div>
-      <div><Label className="text-xs tracking-editorial uppercase text-muted-foreground">Title</Label><Input className="rounded-none mt-1" value={c.title || ''} onChange={e => setContent('title', e.target.value)} placeholder="Section heading" /></div>
-      <div><Label className="text-xs tracking-editorial uppercase text-muted-foreground">Body Copy</Label><Textarea rows={5} className="rounded-none mt-1" value={c.body || ''} onChange={e => setContent('body', e.target.value)} placeholder="Paragraph text…" /></div>
+      <div><Label className="text-xs tracking-editorial uppercase text-muted-foreground">Title</Label><RichTextEditor value={c.title || ''} onChange={value => setContent('title', value)} placeholder="Section heading" /></div>
+      <div><Label className="text-xs tracking-editorial uppercase text-muted-foreground">Body Copy</Label><RichTextEditor value={c.body || ''} onChange={value => setContent('body', value)} placeholder="Paragraph text…" /></div>
       <div><Label className="text-xs tracking-editorial uppercase text-muted-foreground">Text Align</Label>
-        <Select value={st.textAlign || 'center'} onValueChange={v => setStyle('textAlign', v)}>
+        <Select value={st.textAlign || 'left'} onValueChange={v => setStyle('textAlign', v)}>
           <SelectTrigger className="rounded-none mt-1"><SelectValue /></SelectTrigger>
           <SelectContent><SelectItem value="left">Left</SelectItem><SelectItem value="center">Center</SelectItem><SelectItem value="right">Right</SelectItem></SelectContent>
         </Select>
@@ -3540,7 +3620,7 @@ function SectionEditor({ section, onChange }) {
 
   if (section.type === 'promo-banner') return (
     <div className="space-y-4 mt-2">
-      <div><Label className="text-xs tracking-editorial uppercase text-muted-foreground">Banner Text</Label><Textarea rows={3} className="rounded-none mt-1" value={c.text || ''} onChange={e => setContent('text', e.target.value)} placeholder="Promo message…" /></div>
+      <div><Label className="text-xs tracking-editorial uppercase text-muted-foreground">Banner Text</Label><RichTextEditor value={c.text || ''} onChange={value => setContent('text', value)} placeholder="Promo message…" /></div>
       <div className="grid grid-cols-2 gap-4">
         <div><Label className="text-xs tracking-editorial uppercase text-muted-foreground">CTA Label</Label><Input className="rounded-none mt-1" value={c.ctaLabel || ''} onChange={e => setContent('ctaLabel', e.target.value)} placeholder="e.g. Shop Now" /></div>
         <div><Label className="text-xs tracking-editorial uppercase text-muted-foreground">CTA Action (page name)</Label><Input className="rounded-none mt-1" value={c.ctaAction || ''} onChange={e => setContent('ctaAction', e.target.value)} placeholder="e.g. shop" /></div>
@@ -3549,6 +3629,12 @@ function SectionEditor({ section, onChange }) {
         <Select value={st.bgColor || 'dark'} onValueChange={v => setStyle('bgColor', v)}>
           <SelectTrigger className="rounded-none mt-1"><SelectValue /></SelectTrigger>
           <SelectContent><SelectItem value="dark">Dark (Primary)</SelectItem><SelectItem value="light">Light (Muted)</SelectItem></SelectContent>
+        </Select>
+      </div>
+      <div><Label className="text-xs tracking-editorial uppercase text-muted-foreground">Text Align</Label>
+        <Select value={st.textAlign || 'left'} onValueChange={v => setStyle('textAlign', v)}>
+          <SelectTrigger className="rounded-none mt-1"><SelectValue /></SelectTrigger>
+          <SelectContent><SelectItem value="left">Left</SelectItem><SelectItem value="center">Center</SelectItem><SelectItem value="right">Right</SelectItem></SelectContent>
         </Select>
       </div>
     </div>
@@ -3562,14 +3648,14 @@ function Footer() {
   const { settings, navigate, transparentLogo, collections } = useApp()
   const logoSrc = transparentLogo || settings.logoUrl
   const socialLinks = normalizeSocialLinks(settings?.socialLinks).filter(link => link.visible !== false)
-  const boutiqueLinks = getBoutiqueNavItems(settings?.headerNavLinks, collections)
+  const footerLinks = getVisibleNavItems(settings?.headerNavLinks, collections)
   return (
     <footer className="bg-primary text-primary-foreground py-16 mt-20">
       <div className="max-w-[1400px] mx-auto px-4 md:px-8 grid sm:grid-cols-2 lg:grid-cols-4 gap-10">
         <div>
           <div className="text-[11px] tracking-editorial uppercase text-primary-foreground/60 mb-4">Boutique</div>
           <div className="space-y-2 text-sm">
-            {boutiqueLinks.map((link) => (
+            {footerLinks.map((link) => (
               <button key={link.id} className="block" onClick={() => navigate(link.pageKey || link.page, link.collectionSlug ? { collection: link.collectionSlug } : {})}>{link.footerLabel || link.label}</button>
             ))}
           </div>
