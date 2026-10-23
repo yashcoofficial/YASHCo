@@ -34,6 +34,20 @@ const useApp = () => useContext(AppCtx)
 const money = (n, sym = '₹') => `${sym}${(n || 0).toLocaleString('en-IN')}`
 const cx = (...a) => a.filter(Boolean).join(' ')
 
+function getNavigationCategories(link, collections = []) {
+  const pageKey = link?.pageKey || link?.page
+  const collectionSlug = link?.collectionSlug ?? link?.collection ?? null
+  if (pageKey === 'perfume' || collectionSlug === 'perfume') return []
+
+  const categories = collectionSlug
+    ? collections.filter(collection => collection.parentSlug === collectionSlug)
+    : collections.filter(collection => !collection.parentSlug)
+
+  return categories
+    .filter(collection => collection.slug !== 'perfume')
+    .sort((a, b) => (a.order || 0) - (b.order || 0))
+}
+
 async function downloadAdminExport(path, token) {
   const response = await fetch(`/api/admin/export/${path}`, { headers: { Authorization: `Bearer ${token}` } })
   if (!response.ok) throw new Error('Export failed')
@@ -576,7 +590,7 @@ const Header = memo(function Header() {
           <button className="md:hidden" onClick={() => setMenuOpen(true)}><Menu className={cx('w-5 h-5', transparent && 'text-white')} /></button>
           <nav className={cx('hidden md:flex items-center gap-8 text-[11px] tracking-editorial uppercase', transparent && 'text-white')}>
             {navLinks.map(link => {
-              const categories = collections.filter(collection => collection.parentSlug === link.collectionSlug).sort((a, b) => (a.order || 0) - (b.order || 0))
+              const categories = getNavigationCategories(link, collections)
               const hasCategories = link.page === 'shop' && categories.length > 0
               return (
                 <div key={`${link.page}-${link.collection || 'main'}`} className={cx('relative group h-20 flex items-center', hasCategories && 'cursor-pointer')}>
@@ -623,7 +637,7 @@ const MobileMenu = memo(function MobileMenu() {
         <SheetHeader><SheetTitle className="font-serif text-2xl">Menu</SheetTitle></SheetHeader>
         <div className="mt-8 flex flex-col gap-5 text-sm tracking-editorial uppercase">
           {navLinks.map(link => {
-            const categories = collections.filter(collection => collection.parentSlug === link.collectionSlug).sort((a, b) => (a.order || 0) - (b.order || 0))
+            const categories = getNavigationCategories(link, collections)
             const hasCategories = link.page === 'shop' && categories.length > 0
             const isExpanded = expandedCollections.includes(link.collectionSlug)
             return (
