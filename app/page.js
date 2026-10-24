@@ -145,6 +145,14 @@ function colorHex(name) {
   return resolveColorValue(name)
 }
 
+function hasRichTextContent(value) {
+  return String(value || '').replace(/<[^>]*>/g, ' ').replace(/&nbsp;|&#160;/gi, ' ').trim().length > 0
+}
+
+function isVideoUrl(value = '') {
+  return /\.(mp4|webm|mov)(?:[?#].*)?$/i.test(value) || /\/video\/upload\//i.test(value)
+}
+
 // ---------- Root ----------
 export default function App() {
   const getInitialView = () => {
@@ -251,7 +259,8 @@ export default function App() {
   useEffect(() => {
     if (!['home', 'dashboard'].includes(view.name) || sessionStorage.getItem('yash15_welcome_seen')) return
     sessionStorage.setItem('yash15_welcome_seen', 'true')
-    setPromoPopupOpen(true)
+    const timeout = window.setTimeout(() => setPromoPopupOpen(true), 4500)
+    return () => window.clearTimeout(timeout)
   }, [view.name])
 
   // Fetch all products once (for dynamic filter facets)
@@ -584,10 +593,10 @@ const Header = memo(function Header() {
   const logoSrc = transparentLogo || settings.logoUrl
   const navLinks = useMemo(() => getVisibleNavItems(settings?.headerNavLinks, collections), [settings?.headerNavLinks, collections])
   return (
-    <header className={cx('sticky top-0 z-40 transition-all', transparent ? 'bg-transparent' : 'bg-background/90 backdrop-blur-md border-b border-border')}>
+    <header className={cx('sticky top-0 z-40 transition-all', transparent ? 'bg-background/90 backdrop-blur-md border-b border-border md:bg-transparent md:backdrop-blur-none md:border-transparent' : 'bg-background/90 backdrop-blur-md border-b border-border')}>
       <div className="max-w-[1400px] mx-auto px-4 md:px-8 h-20 flex items-center justify-between">
         <div className="flex items-center gap-6 flex-1">
-          <button className="md:hidden" onClick={() => setMenuOpen(true)}><Menu className={cx('w-5 h-5', transparent && 'text-white')} /></button>
+          <button className="md:hidden" onClick={() => setMenuOpen(true)}><Menu className={cx('w-5 h-5', transparent && 'md:text-white')} /></button>
           <nav className={cx('hidden md:flex items-center gap-8 text-[11px] tracking-editorial uppercase', transparent && 'text-white')}>
             {navLinks.map(link => {
               const categories = getNavigationCategories(link, collections)
@@ -604,9 +613,9 @@ const Header = memo(function Header() {
           </nav>
         </div>
         <button onClick={() => navigate('home')} className="flex items-center justify-center">
-          <img src={logoSrc} alt={settings.brand} className={cx('h-12 md:h-14 object-contain', !transparentLogo && 'mix-blend-multiply', transparent && 'brightness-0 invert')} />
+          <img src={logoSrc} alt={settings.brand} className={cx('h-12 md:h-14 object-contain', !transparentLogo && 'mix-blend-multiply', transparent && 'md:brightness-0 md:invert')} />
         </button>
-        <div className={cx('flex items-center gap-4 flex-1 justify-end', transparent ? 'text-white' : 'text-foreground')}>
+        <div className={cx('flex items-center gap-4 flex-1 justify-end', transparent ? 'text-foreground md:text-white' : 'text-foreground')}>
           <button onClick={() => navigate('shop')} className="hidden md:block"><Search className="w-4 h-4" /></button>
           {user
             ? <button onClick={() => navigate(user.role === 'admin' ? 'admin' : 'dashboard')} className="text-[11px] tracking-editorial uppercase hidden md:flex items-center gap-2"><User className="w-4 h-4" /> {user.role === 'admin' ? 'Admin' : 'Account'}</button>
@@ -786,8 +795,12 @@ function HomeView() {
   const heroOverlay = parseFloat(settings.heroOverlay ?? 0.4)
   const heroSize = settings.heroTitleSize || 'xl'
   const heroImageDesktop = settings.heroImageDesktop || settings.heroImage
-  const heroImageMobile = settings.heroImageMobile || settings.heroImage
+  const heroImageMobile = settings.heroImageMobile || settings.heroImage || heroImageDesktop
+  const heroDesktopIsVideo = isVideoUrl(heroImageDesktop)
+  const heroMobileIsVideo = isVideoUrl(heroImageMobile)
   const heroObjectPosition = settings.heroObjectPosition || 'center center'
+  const heroTitle = settings.heroTitle
+  const heroSubtitle = settings.heroSubtitle
   const collCols = settings.collectionsColumns || '3'
   const featCols = settings.featuredColumns || '4'
   const featuredProductCount = Math.max(1, Math.min(12, Number(settings.featuredProductCount) || 4))
@@ -820,12 +833,13 @@ function HomeView() {
   const renderSection = (id) => {
     switch (id) {
       case 'hero': return (
-        <section key="hero" className="hero-home-banner relative mt-0 sm:-mt-20 overflow-hidden" style={{ '--hero-height': heroH }}>
-          <picture className="absolute inset-0 block h-full w-full">
-            <source media="(max-width: 767px)" srcSet={heroImageMobile} />
-            <source media="(min-width: 768px)" srcSet={heroImageDesktop} />
-            <img src={heroImageDesktop} alt="" className="absolute inset-0 h-full w-full object-cover" style={{ objectPosition: heroObjectPosition }} />
-          </picture>
+        <section key="hero" className="hero-home-banner relative mt-0 sm:-mt-20 overflow-hidden bg-[#201f1c]" style={{ '--hero-height': heroH }}>
+          {heroDesktopIsVideo
+            ? <video src={heroImageDesktop} autoPlay muted loop playsInline preload="metadata" className="absolute inset-0 hidden h-full w-full object-cover md:block" style={{ objectPosition: heroObjectPosition }} />
+            : heroImageDesktop && <img src={heroImageDesktop} alt="" className="absolute inset-0 hidden h-full w-full object-cover md:block" style={{ objectPosition: heroObjectPosition }} />}
+          {heroMobileIsVideo
+            ? <video src={heroImageMobile} autoPlay muted loop playsInline preload="metadata" className="absolute inset-0 h-full w-full object-cover md:hidden" style={{ objectPosition: heroObjectPosition }} />
+            : heroImageMobile && <img src={heroImageMobile} alt="" className="absolute inset-0 h-full w-full object-cover md:hidden" style={{ objectPosition: heroObjectPosition }} />}
           <div className="absolute inset-0" style={{ background: `linear-gradient(to bottom, rgba(0,0,0,${heroOverlay * 0.8}), rgba(0,0,0,${heroOverlay * 0.3}), rgba(0,0,0,${heroOverlay * 1.2}))` }} />
           <div className={cx('hero-home-copy relative z-10 h-full flex max-w-full flex-col px-4 sm:px-6 slow-fade',
             heroAlign === 'center' && 'items-center text-center',
@@ -836,13 +850,13 @@ function HomeView() {
             heroVPos === 'top' && 'justify-start pt-20 sm:pt-32',
           )}>
             <div className="text-white/80 text-[11px] tracking-luxe uppercase mb-4 sm:mb-6">{settings.heroEyebrow || 'Season 01 — Nocturne'}</div>
-            <div role="heading" aria-level={1} className={cx('hero-title font-serif text-white leading-[0.95] font-light max-w-full break-words',
+            {hasRichTextContent(heroTitle) && <h1 className={cx('hero-title font-serif text-white leading-[0.95] font-light max-w-full break-words',
               heroSize === 'xl' && 'text-4xl sm:text-6xl md:text-8xl lg:text-9xl',
               heroSize === 'lg' && 'text-4xl sm:text-5xl md:text-7xl lg:text-8xl',
               heroSize === 'md' && 'text-3xl sm:text-4xl md:text-6xl lg:text-7xl',
               heroSize === 'sm' && 'text-3xl sm:text-4xl md:text-5xl lg:text-6xl',
-            )}><RichTextContent value={settings.heroTitle} /></div>
-            <div className="hero-subtitle text-white/85 mt-4 sm:mt-6 max-w-[min(100%,36rem)] text-sm md:text-base leading-relaxed"><RichTextContent value={settings.heroSubtitle} /></div>
+            )}><RichTextContent value={heroTitle} /></h1>}
+            {hasRichTextContent(heroSubtitle) && <div className="hero-subtitle text-white/85 mt-4 sm:mt-6 max-w-[min(100%,36rem)] text-sm md:text-base leading-relaxed"><RichTextContent value={heroSubtitle} /></div>}
             <Button onClick={() => navigate('shop')} className="hero-cta mt-8 sm:mt-10 rounded-none bg-white text-black hover:bg-white/90 h-12 px-6 sm:px-10 tracking-editorial uppercase text-xs max-w-full whitespace-nowrap">{settings.heroCtaLabel || 'Discover the Collection'}</Button>
           </div>
         </section>
