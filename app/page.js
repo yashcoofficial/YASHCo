@@ -16,7 +16,7 @@ import { Switch } from '@/components/ui/switch'
 import {
   ShoppingBag, Heart, User, Search, Menu, X, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Plus, Minus,
   Trash2, LogOut, Edit3, Package, Mail, MessageCircle, Settings as SettingsIcon,
-  Truck, Star, Filter, Check, ArrowRight, Instagram, Facebook, Twitter,
+  Truck, Star, Filter, Check, ArrowRight, Facebook, Twitter,
   GripVertical, Eye, EyeOff, Download, ZoomIn, Bold, Italic, Underline as UnderlineIcon,
   Strikethrough, List, ListOrdered, Heading2, Heading3,
 } from 'lucide-react'
@@ -127,11 +127,40 @@ function normalizeSocialLinks(items) {
   })) : DEFAULT_SOCIAL_LINKS
 }
 
+function InstagramMark({ className }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" aria-hidden="true" fill="none">
+      <defs>
+        <linearGradient id="instagram-gradient" x1="3" y1="21" x2="21" y2="3" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#FFDC80" />
+          <stop offset="0.32" stopColor="#F77737" />
+          <stop offset="0.66" stopColor="#E1306C" />
+          <stop offset="1" stopColor="#833AB4" />
+        </linearGradient>
+      </defs>
+      <rect x="2" y="2" width="20" height="20" rx="5.5" fill="url(#instagram-gradient)" />
+      <rect x="6.5" y="6.5" width="11" height="11" rx="3.25" stroke="white" strokeWidth="1.8" />
+      <circle cx="12" cy="12" r="2.6" stroke="white" strokeWidth="1.8" />
+      <circle cx="17.3" cy="6.9" r="1.1" fill="white" />
+    </svg>
+  )
+}
+
+function YouTubeMark({ className }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" aria-hidden="true" fill="none">
+      <rect x="2" y="5" width="20" height="14" rx="4" fill="#FF0033" />
+      <path d="M10 9.25v5.5L15 12l-5-2.75Z" fill="white" />
+    </svg>
+  )
+}
+
 function socialIconFor(label = '') {
   const name = String(label).toLowerCase()
-  if (name.includes('instagram')) return Instagram
+  if (name.includes('instagram')) return InstagramMark
   if (name.includes('facebook') || name.includes('meta')) return Facebook
   if (name.includes('twitter') || name.includes('x')) return Twitter
+  if (name.includes('youtube')) return YouTubeMark
   return MessageCircle
 }
 
