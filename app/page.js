@@ -1026,11 +1026,13 @@ const ProductCard = memo(function ProductCard({ p, overrideImage, aspectRatio })
   const inWish = wishlist.includes(p.id)
   const stockStatusText = getStockStatusText(p)
   const swatches = getColorSwatches(p.colors || [], p.colorHexes || []).slice(0, 4)
+  const secondaryImage = p.images?.slice(1).find(Boolean)
 
   return (
     <div className="group cursor-pointer" onClick={() => navigate('product', { id: p.id })}>
       <div className="bg-muted relative overflow-hidden" style={{ aspectRatio: aspectRatio || '3/4' }}>
-        <img src={overrideImage || p.images?.[0]} alt={p.name} className="w-full h-full object-cover" />
+        <img src={overrideImage || p.images?.[0]} alt={p.name} className={cx('w-full h-full object-cover', secondaryImage && 'transition-opacity duration-300 group-hover:opacity-0')} />
+        {secondaryImage && <img src={secondaryImage} alt="" aria-hidden="true" className="absolute inset-0 h-full w-full object-cover opacity-0 transition-opacity duration-300 group-hover:opacity-100" />}
         {getDiscountPercentage(p) > 0 && <span className="absolute top-3 left-3 bg-accent text-accent-foreground px-2.5 py-1 text-[10px] tracking-editorial uppercase">{getDiscountPercentage(p)}% Off</span>}
         <button onClick={(e) => { e.stopPropagation(); toggleWishlist(p.id) }} className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/90 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
           <Heart className={cx('w-3.5 h-3.5', inWish ? 'fill-accent text-accent' : 'text-foreground')} />
