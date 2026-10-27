@@ -116,3 +116,58 @@
     }
   }
 }
+
+/* YASH Atelier — Quiet Luxury Design System
+   Presentation only: existing branding, catalog, navigation and commerce remain intact. */
+:root {
+  --yash-ink: #1b1a18;
+  --yash-paper: #faf8f4;
+  --yash-stone: #e7e1d8;
+  --yash-muted: #777168;
+  --yash-bronze: #907b5b;
+  --yash-ease: cubic-bezier(.22, 1, .36, 1);
+}
+html { scroll-behavior: smooth; }
+body {
+  background: var(--yash-paper);
+  color: var(--yash-ink);
+  font-feature-settings: "kern" 1, "liga" 1;
+  text-rendering: optimizeLegibility;
+}
+::selection { background: #dcd0bd; color: var(--yash-ink); }
+:focus-visible { outline: 2px solid var(--yash-bronze); outline-offset: 4px; }
+button, a, input, textarea, select { -webkit-tap-highlight-color: transparent; }
+a { text-underline-offset: .24em; }
+h1, h2, h3 { text-wrap: balance; }
+h1 { letter-spacing: -.035em; }
+h2 { letter-spacing: -.025em; }
+p { text-wrap: pretty; }
+img, video { max-width: 100%; }
+button, [role="button"] { transition: background-color .25s ease, color .25s ease, border-color .25s ease, opacity .25s ease, transform .4s var(--yash-ease); }
+button:disabled { cursor: not-allowed; opacity: .55; }
+input:not([type="checkbox"]):not([type="radio"]), textarea, select {
+  border-radius: 2px;
+  transition: border-color .22s ease, box-shadow .22s ease;
+}
+input:focus-visible, textarea:focus-visible, select:focus-visible { outline-offset: 2px; }
+.hero-home-banner { isolation: isolate; }
+.hero-home-copy { text-shadow: 0 1px 20px rgb(0 0 0 / .15); }
+.hero-title { letter-spacing: -.045em; line-height: .98; }
+.hero-subtitle { letter-spacing: .025em; line-height: 1.7; }
+.hero-cta { letter-spacing: .13em; text-transform: uppercase; font-size: .72rem; font-weight: 500; }
+.img-zoom img { will-change: auto; transition: transform 1.2s var(--yash-ease); }
+.img-zoom:hover img { transform: scale(1.035); }
+.hover-lift:hover { transform: translateY(-2px); box-shadow: 0 14px 36px rgb(30 25 20 / .08); }
+.divider-gold { background: linear-gradient(90deg, transparent, #a28a67 50%, transparent); }
+@media (min-width: 1024px) {
+  .hero-home-copy { padding-bottom: clamp(3rem, 7vh, 7rem); }
+}
+@media (max-width: 767px) {
+  .hero-title { letter-spacing: -.035em; }
+  .hero-subtitle { line-height: 1.55; }
+  button, a { touch-action: manipulation; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
