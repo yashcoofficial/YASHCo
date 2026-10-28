@@ -1546,7 +1546,7 @@ function ProductView() {
       {outfitProducts.length > 0 && (
         <section className="mt-16 border-t border-border pt-10">
           <div className="mb-6">
-            <h2 className="font-serif text-2xl font-bold tracking-editorial uppercase text-black">STYLED TOGETHER</h2>
+            <h2 className="text-xs font-normal tracking-editorial uppercase text-black">STYLED TOGETHER</h2>
           </div>
           <div className="grid grid-cols-2 gap-x-4 gap-y-8 md:grid-cols-4 md:gap-x-6">
             {outfitProducts.map(item => <ProductCard key={item.id} p={item} />)}
