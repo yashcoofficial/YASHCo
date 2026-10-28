@@ -495,6 +495,7 @@ async function route(req, method, segments) {
         care: body.care || '',
         sizeGuide: body.sizeGuide || '',
         sizeGuideImage: body.sizeGuideImage || '',
+        outfitProductIds: Array.isArray(body.outfitProductIds) ? body.outfitProductIds.filter(id => typeof id === 'string') : [],
         featured: !!body.featured,
         hidden: !!body.hidden,
         lowStockThreshold: parseInt(body.lowStockThreshold) || 3,

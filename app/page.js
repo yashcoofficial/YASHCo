@@ -1394,7 +1394,7 @@ const BRAND_SIZE_CHART = [
 ]
 
 function ProductView() {
-  const { api, view, settings, collections, addToCart, toggleWishlist, wishlist, navigate } = useApp()
+  const { api, view, settings, collections, allProducts, addToCart, toggleWishlist, wishlist, navigate } = useApp()
   const [product, setProduct] = useState(null)
   const [size, setSize] = useState('')
   const [color, setColor] = useState('')
@@ -1413,6 +1413,9 @@ function ProductView() {
   const productCollection = collections.find(collection => collection.slug === product.collection)
   const parentCollection = productCollection?.parentSlug ? collections.find(collection => collection.slug === productCollection.parentSlug) : null
   const collectionTrail = [parentCollection?.name, productCollection?.name || product.collection].filter(Boolean).join(', ')
+  const outfitProducts = (product.outfitProductIds || [])
+    .map(id => allProducts.find(item => item.id === id))
+    .filter(item => item && item.id !== product.id && !item.hidden)
 
   return (
     <div className="max-w-[1400px] mx-auto px-4 md:px-8 py-8 md:py-16">
@@ -1539,6 +1542,17 @@ function ProductView() {
           </div>
         </div>
       </div>
+
+      {outfitProducts.length > 0 && (
+        <section className="mt-16 border-t border-border pt-10">
+          <div className="mb-6">
+            <h2 className="font-serif text-2xl font-bold tracking-editorial uppercase text-black">STYLED TOGETHER</h2>
+          </div>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-8 md:grid-cols-4 md:gap-x-6">
+            {outfitProducts.map(item => <ProductCard key={item.id} p={item} />)}
+          </div>
+        </section>
+      )}
 
       <ProductImageDialog open={imageOpen} onOpenChange={setImageOpen} image={product.images?.[activeImg]} productName={product.name} />
       <InquiryDialog open={inquiryOpen} onOpenChange={setInquiryOpen} productId={product.id} productName={product.name} />
@@ -2288,10 +2302,11 @@ function AdminProducts() {
   const { api, collections } = useApp()
   const [products, setProducts] = useState([])
   const [editing, setEditing] = useState(null)
+  const [outfitSearch, setOutfitSearch] = useState('')
   const [draggedProductId, setDraggedProductId] = useState(null)
   const reload = () => api('/products?includeHidden=true').then(r => setProducts(r.products))
   useEffect(() => { reload() }, [])
-  const empty = { name: '', description: '', collection: 'womenswear', price: 0, salePrice: '', shipping: 0, sku: '', stock: 0, images: [''], sizes: ['S', 'M', 'L', 'XL'], colors: ['Noir', 'Ivory', 'Champagne'], colorHexes: [], material: '', care: '', sizeGuide: '', sizeGuideImage: '', featured: false, hidden: false, lowStockThreshold: 3 }
+  const empty = { name: '', description: '', collection: 'womenswear', price: 0, salePrice: '', shipping: 0, sku: '', stock: 0, images: [''], sizes: ['S', 'M', 'L', 'XL'], colors: ['Noir', 'Ivory', 'Champagne'], colorHexes: [], material: '', care: '', sizeGuide: '', sizeGuideImage: '', outfitProductIds: [], featured: false, hidden: false, lowStockThreshold: 3 }
   const saveOrder = async (nextProducts) => {
     setProducts(nextProducts)
     try {
@@ -2336,7 +2351,7 @@ function AdminProducts() {
     <div>
       <div className="flex justify-between mb-6">
         <h3 className="font-serif text-2xl">Products ({products.length})</h3>
-        <Button className="rounded-none tracking-editorial uppercase text-xs" onClick={() => setEditing({ ...empty })}><Plus className="w-3.5 h-3.5 mr-2" />New Product</Button>
+        <Button className="rounded-none tracking-editorial uppercase text-xs" onClick={() => { setOutfitSearch(''); setEditing({ ...empty }) }}><Plus className="w-3.5 h-3.5 mr-2" />New Product</Button>
       </div>
       <div className="grid gap-2">
         {products.map(p => {
@@ -2368,7 +2383,7 @@ function AdminProducts() {
               <Badge className={cx('rounded-none', stock <= lowStockThreshold ? 'bg-destructive text-destructive-foreground' : 'bg-muted text-foreground')}>Stock {stock}</Badge>
               <div className="flex gap-2">
                 <Button size="sm" variant="outline" className="rounded-none" title={p.hidden ? 'Show product' : 'Hide product'} aria-label={p.hidden ? `Show ${p.name}` : `Hide ${p.name}`} onClick={() => toggleVisibility(p)}>{p.hidden ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}</Button>
-                <Button size="sm" variant="outline" className="rounded-none" onClick={() => setEditing({ ...p, sizeGuideImage: getSizeGuideImage(p), images: p.images?.length ? p.images : [''] })}><Edit3 className="w-3.5 h-3.5" /></Button>
+                <Button size="sm" variant="outline" className="rounded-none" onClick={() => { setOutfitSearch(''); setEditing({ ...p, outfitProductIds: p.outfitProductIds || [], sizeGuideImage: getSizeGuideImage(p), images: p.images?.length ? p.images : [''] }) }}><Edit3 className="w-3.5 h-3.5" /></Button>
                 <Button size="sm" variant="outline" className="rounded-none" onClick={() => remove(p.id)}><Trash2 className="w-3.5 h-3.5" /></Button>
               </div>
             </div>
@@ -2409,6 +2424,35 @@ function AdminProducts() {
                 </div>
               ))}
               <Button variant="outline" size="sm" className="rounded-none mt-2" onClick={() => setEditing({ ...editing, images: [...editing.images, ''] })}>+ Add Image</Button>
+            </div>
+            <div className="space-y-2 border-t border-border pt-4">
+              <div>
+                <Label className="text-xs">Styled together</Label>
+                <p className="text-xs text-muted-foreground mt-1">Choose individual products to show with this outfit.</p>
+              </div>
+              <Input className="rounded-none" placeholder="Search products" value={outfitSearch} onChange={event => setOutfitSearch(event.target.value)} />
+              <div className="max-h-48 overflow-y-auto border border-border">
+                {products
+                  .filter(item => item.id !== editing.id && item.name?.toLowerCase().includes(outfitSearch.trim().toLowerCase()))
+                  .map(item => (
+                    <label key={item.id} className="flex cursor-pointer items-center gap-3 border-b border-border p-2.5 text-sm last:border-b-0">
+                      <input
+                        type="checkbox"
+                        checked={(editing.outfitProductIds || []).includes(item.id)}
+                        onChange={event => {
+                          const currentIds = editing.outfitProductIds || []
+                          const outfitProductIds = event.target.checked
+                            ? [...currentIds, item.id]
+                            : currentIds.filter(id => id !== item.id)
+                          setEditing({ ...editing, outfitProductIds })
+                        }}
+                        className="h-4 w-4 accent-foreground"
+                      />
+                      {item.images?.[0] && <img src={item.images[0]} alt="" className="h-12 w-9 object-cover" />}
+                      <span>{item.name}</span>
+                    </label>
+                  ))}
+              </div>
             </div>
             <Input placeholder="Sizes (comma separated)" className="rounded-none" value={Array.isArray(editing.sizes) ? editing.sizes.join(',') : ''} onChange={e => setEditing({ ...editing, sizes: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })} />
             <div className="space-y-2">
