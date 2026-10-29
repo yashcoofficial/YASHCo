@@ -2566,15 +2566,28 @@ function AdminCollections() {
   const { api, collections, setCollections } = useApp()
   const topLevelCollections = collections.filter(collection => !collection.parentSlug)
   const [editing, setEditing] = useState(null)
-  const reload = () => api('/collections').then(r => setCollections(r.collections))
+  const reload = async () => {
+    const result = await api('/collections')
+    setCollections(result.collections || [])
+  }
   const save = async () => {
     try {
       if (editing.id) await api(`/collections/${editing.id}`, { method: 'PUT', body: editing })
       else await api('/collections', { method: 'POST', body: editing })
-      toast.success('Saved'); setEditing(null); reload()
+      await reload()
+      toast.success(editing.parentSlug ? 'Category saved' : 'Collection saved')
+      setEditing(null)
     } catch (e) { toast.error(e.message) }
   }
-  const remove = async (id) => { if (!confirm('Delete?')) return; await api(`/collections/${id}`, { method: 'DELETE' }); reload() }
+  const remove = async (collection) => {
+    const label = collection.parentSlug ? 'category' : 'collection'
+    if (!confirm(`Delete this ${label}?`)) return
+    try {
+      await api(`/collections/${collection.id}`, { method: 'DELETE' })
+      await reload()
+      toast.success(`${label[0].toUpperCase()}${label.slice(1)} deleted`)
+    } catch (e) { toast.error(e.message) }
+  }
   return (
     <div>
       <div className="flex justify-between mb-6"><h3 className="font-serif text-2xl">Collections & Categories</h3><Button className="rounded-none tracking-editorial uppercase text-xs" onClick={() => setEditing({ name: '', slug: '', image: '', description: '', order: topLevelCollections.length + 1, parentSlug: null })}><Plus className="w-3.5 h-3.5 mr-2" />New Collection</Button></div>
@@ -2585,21 +2598,21 @@ function AdminCollections() {
             <div className="font-serif text-xl">{c.name}</div>
             <div className="text-xs text-muted-foreground">{c.slug}</div>
             <div className="mt-4 border-t border-border pt-3">
-              <div className="flex items-center justify-between mb-2"><span className="text-[11px] tracking-editorial uppercase text-muted-foreground">Categories</span><Button size="sm" variant="outline" className="rounded-none h-7 text-[10px]" onClick={() => setEditing({ name: '', slug: '', parentSlug: c.slug, image: '', description: '', order: collections.filter(child => child.parentSlug === c.slug).length + 1 })}><Plus className="w-3 h-3 mr-1" />Add</Button></div>
+              <div className="flex items-center justify-between mb-2"><span className="text-[11px] tracking-editorial uppercase text-muted-foreground">Categories</span><Button size="sm" variant="outline" className="rounded-none h-7 text-[10px]" onClick={() => setEditing({ name: '', slug: '', parentSlug: c.slug, image: '', description: '', order: collections.filter(child => child.parentSlug === c.slug).length + 1 })}><Plus className="w-3 h-3 mr-1" />Add Category</Button></div>
               <div className="space-y-1">
-                {collections.filter(child => child.parentSlug === c.slug).sort((a, b) => (a.order || 0) - (b.order || 0)).map(child => <div key={child.id} className="flex items-center justify-between text-sm"><span>{child.name}</span><Button size="sm" variant="ghost" className="h-7 px-2 text-destructive" onClick={() => remove(child.id)}><Trash2 className="w-3 h-3" /></Button></div>)}
+                {collections.filter(child => child.parentSlug === c.slug).sort((a, b) => (a.order || 0) - (b.order || 0)).map(child => <div key={child.id} className="flex items-center justify-between text-sm"><span>{child.name}</span><Button size="sm" variant="ghost" className="h-7 px-2 text-destructive" aria-label={`Delete ${child.name} category`} title="Delete category" onClick={() => remove(child)}><Trash2 className="w-3 h-3" /></Button></div>)}
               </div>
             </div>
             <div className="flex gap-2 mt-3">
               <Button size="sm" variant="outline" className="rounded-none" onClick={() => setEditing(c)}>Edit</Button>
-              <Button size="sm" variant="outline" className="rounded-none" onClick={() => remove(c.id)}>Delete</Button>
+              <Button size="sm" variant="outline" className="rounded-none" onClick={() => remove(c)}>Delete</Button>
             </div>
           </div>
         ))}
       </div>
       <Dialog open={!!editing} onOpenChange={o => !o && setEditing(null)}>
         <DialogContent className="rounded-none">
-          <DialogHeader><DialogTitle className="font-serif text-2xl">{editing?.id ? 'Edit' : 'New'} Collection</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle className="font-serif text-2xl">{editing?.id ? 'Edit' : 'New'} {editing?.parentSlug ? 'Category' : 'Collection'}</DialogTitle></DialogHeader>
           {editing && <div className="space-y-3">
             <Input placeholder="Name" className="rounded-none" value={editing.name} onChange={e => setEditing({ ...editing, name: e.target.value })} />
             <Input placeholder="Slug" className="rounded-none" value={editing.slug} onChange={e => setEditing({ ...editing, slug: e.target.value })} />
