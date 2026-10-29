@@ -182,6 +182,33 @@ function isVideoUrl(value = '') {
   return /\.(mp4|webm|mov)(?:[?#].*)?$/i.test(value) || /\/video\/upload\//i.test(value)
 }
 
+function HeroVideo({ src, className, style }) {
+  const videoRef = useRef(null)
+
+  useEffect(() => {
+    const video = videoRef.current
+    if (!video) return
+
+    const attemptPlayback = () => {
+      if (document.visibilityState === 'hidden' || !video.paused) return
+      video.play()?.catch(() => {})
+    }
+
+    video.addEventListener('loadeddata', attemptPlayback)
+    video.addEventListener('canplay', attemptPlayback)
+    document.addEventListener('visibilitychange', attemptPlayback)
+    attemptPlayback()
+
+    return () => {
+      video.removeEventListener('loadeddata', attemptPlayback)
+      video.removeEventListener('canplay', attemptPlayback)
+      document.removeEventListener('visibilitychange', attemptPlayback)
+    }
+  }, [src])
+
+  return <video ref={videoRef} src={src} autoPlay muted loop playsInline preload="metadata" className={className} style={style} />
+}
+
 // ---------- Root ----------
 export default function App() {
   const getInitialView = () => {
@@ -864,10 +891,10 @@ function HomeView() {
       case 'hero': return (
         <section key="hero" className="hero-home-banner relative mt-0 sm:-mt-20 overflow-hidden bg-[#201f1c]" style={{ '--hero-height': heroH }}>
           {heroDesktopIsVideo
-            ? <video src={heroImageDesktop} autoPlay muted loop playsInline preload="metadata" className="absolute inset-0 hidden h-full w-full object-cover md:block" style={{ objectPosition: heroObjectPosition }} />
+            ? <HeroVideo src={heroImageDesktop} className="absolute inset-0 hidden h-full w-full object-cover md:block" style={{ objectPosition: heroObjectPosition }} />
             : heroImageDesktop && <img src={heroImageDesktop} alt="" className="absolute inset-0 hidden h-full w-full object-cover md:block" style={{ objectPosition: heroObjectPosition }} />}
           {heroMobileIsVideo
-            ? <video src={heroImageMobile} autoPlay muted loop playsInline preload="metadata" className="absolute inset-0 h-full w-full object-cover md:hidden" style={{ objectPosition: heroObjectPosition }} />
+            ? <HeroVideo src={heroImageMobile} className="absolute inset-0 h-full w-full object-cover md:hidden" style={{ objectPosition: heroObjectPosition }} />
             : heroImageMobile && <img src={heroImageMobile} alt="" className="absolute inset-0 h-full w-full object-cover md:hidden" style={{ objectPosition: heroObjectPosition }} />}
           <div className="absolute inset-0" style={{ background: `linear-gradient(to bottom, rgba(0,0,0,${heroOverlay * 0.8}), rgba(0,0,0,${heroOverlay * 0.3}), rgba(0,0,0,${heroOverlay * 1.2}))` }} />
           <div className={cx('hero-home-copy relative z-10 h-full flex max-w-full flex-col px-4 sm:px-6 slow-fade',
