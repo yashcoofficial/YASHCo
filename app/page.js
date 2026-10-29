@@ -1413,13 +1413,6 @@ function ShopView() {
 }
 
 // ---------- Product Detail ----------
-const BRAND_SIZE_CHART = [
-  { size: 'S', chest: '40', length: '27.5', shoulder: '17.5', waist: '38' },
-  { size: 'M', chest: '42', length: '28', shoulder: '18', waist: '40' },
-  { size: 'L', chest: '43', length: '28.5', shoulder: '18.5', waist: '42' },
-  { size: 'XL', chest: '47', length: '29', shoulder: '19', waist: '45' },
-]
-
 function ProductView() {
   const { api, view, settings, collections, allProducts, addToCart, toggleWishlist, wishlist, navigate } = useApp()
   const [product, setProduct] = useState(null)
@@ -1484,46 +1477,20 @@ function ProductView() {
           <div className="mt-8">
             <div className="flex items-center justify-between mb-3">
               <Label className="text-[11px] tracking-editorial uppercase text-muted-foreground">Size</Label>
-              <span className="text-[11px] tracking-editorial uppercase text-muted-foreground">Size Guide</span>
+              {sizeGuideImage && !sizeGuideImageFailed && <span className="text-[11px] tracking-editorial uppercase text-muted-foreground">Size Guide</span>}
             </div>
             <div className="flex flex-wrap gap-2">
               {product.sizes?.map(s => <button key={s} onClick={() => setSize(s)} className={cx('px-4 py-2 border text-xs', size === s ? 'border-primary bg-primary text-primary-foreground' : 'border-border')}>{s}</button>)}
             </div>
           </div>
 
-          <div className="mt-6 rounded-none border border-border p-4">
-            <div className="text-[11px] tracking-editorial uppercase text-muted-foreground mb-3">Size Guide</div>
-            <p className="text-xs text-muted-foreground mb-3">All measurements are in inches.</p>
-            {sizeGuideImage && !sizeGuideImageFailed ? (
+          {sizeGuideImage && !sizeGuideImageFailed && (
+            <div className="mt-6 rounded-none border border-border p-4">
+              <div className="text-[11px] tracking-editorial uppercase text-muted-foreground mb-3">Size Guide</div>
               <img src={sizeGuideImage} alt="Size chart with measurements in inches" className="block max-w-full max-h-[32rem] mx-auto h-auto object-contain" onError={() => setSizeGuideImageFailed(true)} />
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[480px] text-sm">
-                  <thead>
-                    <tr className="border-b border-border text-left text-[11px] tracking-editorial uppercase text-muted-foreground">
-                      <th className="pb-2 pr-4 font-normal">Size</th>
-                      <th className="pb-2 pr-4 font-normal">Chest</th>
-                      <th className="pb-2 pr-4 font-normal">Length</th>
-                      <th className="pb-2 pr-4 font-normal">Shoulder</th>
-                      <th className="pb-2 font-normal">Waist</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {BRAND_SIZE_CHART.map(measurement => (
-                      <tr key={measurement.size} className="border-b border-border last:border-0">
-                        <td className="py-3 pr-4 font-medium">{measurement.size}</td>
-                        <td className="py-3 pr-4">{measurement.chest}</td>
-                        <td className="py-3 pr-4">{measurement.length}</td>
-                        <td className="py-3 pr-4">{measurement.shoulder}</td>
-                        <td className="py-3">{measurement.waist}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-            {product.sizeGuide && <p className="text-sm whitespace-pre-wrap mt-4 pt-4 border-t border-border">{product.sizeGuide}</p>}
-          </div>
+              {product.sizeGuide && <p className="text-sm whitespace-pre-wrap mt-4 pt-4 border-t border-border">{product.sizeGuide}</p>}
+            </div>
+          )}
           <div className="mt-6">
             <Label className="text-[11px] tracking-editorial uppercase text-muted-foreground">Colour: {color}</Label>
             <div className="mt-3 flex gap-2 flex-wrap">
