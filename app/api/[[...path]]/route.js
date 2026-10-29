@@ -264,14 +264,16 @@ async function seedIfNeeded() {
     { name: 'Perfume', slug: 'perfume', image: '', description: 'Signature fragrances from the House of YASH.', order: 4, parentSlug: null },
   ]
 
-  for (const collection of requiredCollections) {
-    const existing = await database.collection('collections').findOne({ slug: collection.slug })
-    if (!existing) {
-      await database.collection('collections').insertOne({
+  const collectionSeed = await database.collection('settings').findOne({ key: 'collections-seeded' })
+  if (!collectionSeed) {
+    const collectionCount = await database.collection('collections').countDocuments()
+    if (collectionCount === 0) {
+      await database.collection('collections').insertMany(requiredCollections.map(collection => ({
         id: uuidv4(),
         ...collection,
-      })
+      })))
     }
+    await database.collection('settings').insertOne({ key: 'collections-seeded', initializedAt: new Date() })
   }
 
   const now = new Date()
