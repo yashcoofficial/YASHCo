@@ -43,8 +43,8 @@ const nextConfig = {
     ];
   },
   async rewrites() {
-    if (!process.env.API_SERVICE_URL) return [];
-    return [{ source: '/api/:path*', destination: `${process.env.API_SERVICE_URL}/api/:path*` }];
+    const apiOrigin = process.env.API_SERVICE_URL || 'http://localhost:4000';
+    return [{ source: '/api/:path*', destination: `${apiOrigin}/api/:path*` }];
   },
 };
 

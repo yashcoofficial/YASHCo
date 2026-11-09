@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useMemo, useState, useCallback, useRef, createContext, useContext, memo } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { Toaster, toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -242,6 +243,20 @@ export default function App() {
     return data
   }, [token])
 
+  const bootstrapQuery = useQuery({
+    queryKey: ['site-bootstrap'],
+    queryFn: async () => {
+      const [settingsRes, collectionsRes] = await Promise.all([api('/settings'), api('/collections')])
+      return { settings: settingsRes.settings, collections: collectionsRes.collections || [] }
+    },
+    staleTime: 60_000,
+  })
+  const productsQuery = useQuery({
+    queryKey: ['products'],
+    queryFn: async () => (await api('/products')).products || [],
+    staleTime: 60_000,
+  })
+
   const updateUrlForView = useCallback((nextView, method = 'push') => {
     if (typeof window === 'undefined') return
     const target = buildRouteForView(nextView.name, nextView.params)
@@ -262,33 +277,24 @@ export default function App() {
     }
   }, [updateUrlForView])
 
-  // Load initial
+  // Apply cached data and restore browser-only state.
   useEffect(() => {
-    let mounted = true
+    if (bootstrapQuery.data) {
+      setSettings(bootstrapQuery.data.settings)
+      setCollections(bootstrapQuery.data.collections)
+    }
+  }, [bootstrapQuery.data])
 
-    ;(async () => {
-      try {
-        const [settingsRes, collectionsRes] = await Promise.all([
-          api('/settings'),
-          api('/collections'),
-        ])
+  useEffect(() => {
+    if (productsQuery.data) setAllProducts(productsQuery.data)
+  }, [productsQuery.data])
 
-        if (!mounted) return
-        setSettings(settingsRes.settings)
-        setCollections(collectionsRes.collections || [])
-      } catch (e) {
-        console.error(e)
-      }
-
-      if (!mounted) return
-      const t = localStorage.getItem('yash_token')
-      if (t) setToken(t)
-      const cc = localStorage.getItem('yash_cart')
-      if (cc) try { setCart(JSON.parse(cc)) } catch { }
-    })()
-
-    return () => { mounted = false }
-  }, [api])
+  useEffect(() => {
+    const storedToken = localStorage.getItem('yash_token')
+    if (storedToken) setToken(storedToken)
+    const storedCart = localStorage.getItem('yash_cart')
+    if (storedCart) try { setCart(JSON.parse(storedCart)) } catch { }
+  }, [])
 
   // Auth check when token set
   useEffect(() => {
@@ -318,11 +324,6 @@ export default function App() {
     const timeout = window.setTimeout(() => setPromoPopupOpen(true), 4500)
     return () => window.clearTimeout(timeout)
   }, [view.name])
-
-  // Fetch all products once (for dynamic filter facets)
-  useEffect(() => {
-    api('/products').then(r => setAllProducts(r.products || [])).catch(() => { })
-  }, [api])
 
   // Process logo to remove white background (canvas-based transparent conversion)
   useEffect(() => {

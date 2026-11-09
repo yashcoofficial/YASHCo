@@ -29,6 +29,7 @@ next-env.d.ts
 /build
 dist/
 dist
+**/target/
 
 # Environment files (comprehensive coverage)
 *token.json*
