@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: yashco-api
+    runtime: docker
+    plan: free
+    dockerfilePath: ./services/api/Dockerfile
+    dockerContext: ./services/api
+    healthCheckPath: /api/health
+    envVars:
+      - key: MONGO_URL
+        sync: false
+      - key: DB_NAME
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: APP_URL
+        value: https://www.yashatelier.store
+      - key: COOKIE_SECURE
+        value: "true"
