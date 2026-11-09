@@ -831,7 +831,17 @@ function PromoCodeField({ subtotal, currencySymbol }) {
 }
 
 // ---------- Home ----------
-const DEFAULT_HOME_ORDER = ['hero', 'brand-worlds', 'collections', 'featured', 'lookbook', 'about', 'concierge-cta', 'feedback']
+const DEFAULT_HOME_ORDER = ['hero', 'exclusive-work', 'collections', 'featured', 'lookbook', 'about', 'concierge-cta', 'feedback']
+
+function normalizeHomeSectionOrder(order) {
+  const normalized = [...new Set((Array.isArray(order) ? order : DEFAULT_HOME_ORDER).map(id => id === 'brand-worlds' ? 'exclusive-work' : id))]
+  if (!normalized.includes('exclusive-work')) {
+    const heroIndex = normalized.indexOf('hero')
+    normalized.splice(heroIndex < 0 ? 0 : heroIndex + 1, 0, 'exclusive-work')
+  }
+  if (!normalized.includes('feedback')) normalized.push('feedback')
+  return normalized
+}
 
 function HomeView() {
   const { settings, collections, navigate, api, setFeedbackOpen } = useApp()
@@ -868,12 +878,7 @@ function HomeView() {
   const conBg = settings.conciergeCtaBg || 'light'
 
   const savedSectionOrder = Array.isArray(settings.homeSectionOrder) ? settings.homeSectionOrder : DEFAULT_HOME_ORDER
-  const sectionOrder = useMemo(() => {
-    const withBrandWorlds = savedSectionOrder.includes('brand-worlds')
-      ? savedSectionOrder
-      : [...savedSectionOrder.slice(0, 1), 'brand-worlds', ...savedSectionOrder.slice(1)]
-    return withBrandWorlds.includes('feedback') ? withBrandWorlds : [...withBrandWorlds, 'feedback']
-  }, [savedSectionOrder])
+  const sectionOrder = useMemo(() => normalizeHomeSectionOrder(savedSectionOrder), [savedSectionOrder])
   const vis = settings.homeSectionVisibility || {}
   const visibleCollectionLinks = useMemo(
     () => getBoutiqueNavItems(settings?.headerNavLinks, collections).filter((item) => item.collectionSlug),
@@ -884,7 +889,7 @@ function HomeView() {
       const collection = collections.find((c) => c.slug === link.collectionSlug)
       return collection ? { ...collection, navLabel: link.label, navFooterLabel: link.footerLabel } : null
     })
-    .filter((collection) => collection && !collection.parentSlug)
+    .filter((collection) => collection && !collection.parentSlug && !/hip[\s_-]*hop/i.test(`${collection.slug} ${collection.name} ${collection.navLabel}`))
 
   const renderSection = (id) => {
     switch (id) {
@@ -917,60 +922,30 @@ function HomeView() {
           </div>
         </section>
       )
-      case 'brand-worlds': return (
-        <section key="brand-worlds" className="bg-[#f1eee8] px-4 py-16 sm:px-6 md:py-24">
-          <div className="mx-auto max-w-[1400px]">
-            <div className="mb-8 flex flex-col gap-3 md:mb-12 md:flex-row md:items-end md:justify-between">
-              <div>
-                <div className="mb-3 text-[10px] uppercase tracking-[0.24em] text-[#9a7042]">Two expressions · One YASH</div>
-                <h2 className="font-serif text-3xl leading-tight sm:text-4xl md:text-5xl">Dress for every side of you.</h2>
+      case 'exclusive-work': {
+        const workItems = (Array.isArray(settings.exclusiveWorkItems) ? settings.exclusiveWorkItems : []).filter(item => item?.image)
+        if (!workItems.length) return null
+        return (
+          <section key="exclusive-work" className="bg-[#f1eee8] px-4 py-16 sm:px-6 md:py-24">
+            <div className="mx-auto max-w-[1400px]">
+              <div className="mb-8 md:mb-12">
+                <div className="mb-3 text-[10px] uppercase tracking-[0.24em] text-[#9a7042]">{settings.exclusiveWorkEyebrow || 'Bespoke · Made to Measure'}</div>
+                <h2 className="font-serif text-3xl leading-tight sm:text-4xl md:text-5xl">{settings.exclusiveWorkTitle || 'Our Exclusive Work'}</h2>
               </div>
-              <p className="max-w-sm text-sm leading-relaxed text-[#5e5a54]">Considered formalwear and everyday streetwear, for him and her.</p>
-            </div>
-            <div className="grid gap-4 md:grid-cols-2 md:gap-6">
-              {[
-                {
-                  eyebrow: 'YASH Maison',
-                  title: 'Premium formalwear',
-                  description: 'Precise tailoring. Lasting presence.',
-                  image: 'https://images.pexels.com/photos/32335610/pexels-photo-32335610.jpeg',
-                  position: 'center 35%',
-                  tone: 'from-black/65 via-black/15 to-transparent',
-                },
-                {
-                  eyebrow: 'YASH Street',
-                  title: 'Streetwear, your way',
-                  description: 'Relaxed forms. Unmistakable attitude.',
-                  image: 'https://images.unsplash.com/photo-1529139574466-a303027c1d8b?auto=format&fit=crop&w=1800&q=85',
-                  position: 'center 30%',
-                  tone: 'from-black/75 via-black/20 to-transparent',
-                },
-              ].map((world) => (
-                <article key={world.eyebrow} className="group relative isolate min-h-[420px] overflow-hidden bg-[#25231f] sm:min-h-[520px]">
-                  <img src={world.image} alt="" className="absolute inset-0 -z-20 h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.03]" style={{ objectPosition: world.position }} />
-                  <div className={`absolute inset-0 -z-10 bg-gradient-to-t ${world.tone}`} />
-                  <div className="flex h-full min-h-[420px] flex-col justify-end p-6 text-white sm:min-h-[520px] sm:p-9 md:p-11">
-                    <div className="mb-3 text-[10px] uppercase tracking-[0.24em] text-white/75">{world.eyebrow}</div>
-                    <h3 className="font-serif text-3xl leading-tight sm:text-4xl md:text-5xl">{world.title}</h3>
-                    <p className="mt-2 text-sm text-white/80">{world.description}</p>
-                    <div className="mt-7 flex flex-wrap items-center gap-3">
-                      <span className="mr-1 text-[10px] uppercase tracking-[0.18em] text-white/65">Shop</span>
-                      {[
-                        { label: 'Men', slug: 'menswear' },
-                        { label: 'Women', slug: 'womenswear' },
-                      ].map((audience) => (
-                        <button key={audience.slug} onClick={() => navigate('shop', { collection: audience.slug })} className="inline-flex min-h-10 items-center gap-2 border border-white/55 px-4 text-[10px] uppercase tracking-[0.16em] transition-colors hover:border-white hover:bg-white hover:text-black">
-                          {audience.label}<ArrowRight className="h-3 w-3" />
-                        </button>
-                      ))}
+              <div className={cx('grid gap-5 md:gap-7', settings.exclusiveWorkColumns === '2' && 'md:grid-cols-2', settings.exclusiveWorkColumns !== '2' && 'md:grid-cols-3')}>
+                {workItems.slice(0, 8).map((item, index) => (
+                  <article key={`${item.image}-${index}`}>
+                    <div className="img-zoom overflow-hidden bg-muted" style={{ aspectRatio: settings.exclusiveWorkAspect || '3/4' }}>
+                      <img src={item.image} alt={item.description || 'Bespoke YASH work'} className="h-full w-full object-cover" />
                     </div>
-                  </div>
-                </article>
-              ))}
+                    {item.description && <p className="mt-3 max-w-prose text-sm leading-relaxed text-[#5e5a54]">{item.description}</p>}
+                  </article>
+                ))}
+              </div>
             </div>
-          </div>
-        </section>
-      )
+          </section>
+        )
+      }
       case 'collections':
         const collOverrides = (settings.collectionsImages || '').split('\n').map(x => x.trim()).filter(Boolean)
         if (!collectionItems.length) return null
@@ -2980,14 +2955,38 @@ const HOME_SECTION_DEFS = [
     )
   },
   {
-    id: 'brand-worlds', label: 'YASH Worlds', accent: '#6f4f3e',
-    fields: [],
-    preview: () => (
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', padding: '12px', background: '#f1eee8' }}>
-        <div style={{ background: '#312b26', color: 'white', padding: '20px 12px', fontFamily: 'Georgia,serif', fontSize: '16px' }}>YASH Maison<br /><span style={{ fontSize: '11px' }}>Premium formalwear</span></div>
-        <div style={{ background: '#292d2d', color: 'white', padding: '20px 12px', fontFamily: 'Georgia,serif', fontSize: '16px' }}>YASH Street<br /><span style={{ fontSize: '11px' }}>Streetwear</span></div>
-      </div>
-    ),
+    id: 'exclusive-work', label: 'Our Exclusive Work', accent: '#6f4f3e',
+    fields: [
+      { key: 'exclusiveWorkEyebrow', label: 'Eyebrow Label', type: 'text', placeholder: 'Bespoke · Made to Measure' },
+      { key: 'exclusiveWorkTitle', label: 'Section Title', type: 'text', placeholder: 'Our Exclusive Work' },
+      {
+        key: 'exclusiveWorkColumns', label: 'Gallery Columns', type: 'select', options: [
+          { value: '2', label: '2 Columns' }, { value: '3', label: '3 Columns' },
+        ]
+      },
+      {
+        key: 'exclusiveWorkAspect', label: 'Image Aspect Ratio', type: 'select', options: [
+          { value: '3/4', label: 'Portrait (3:4)' }, { value: '1/1', label: 'Square (1:1)' }, { value: '4/3', label: 'Landscape (4:3)' },
+        ]
+      },
+      { key: 'exclusiveWorkItems', label: 'Work Images', type: 'work-gallery' },
+    ],
+    preview: (s) => {
+      const items = (Array.isArray(s.exclusiveWorkItems) ? s.exclusiveWorkItems : []).filter(item => item?.image).slice(0, 3)
+      return (
+        <div style={{ padding: '18px', background: '#f1eee8' }}>
+          <div style={{ fontSize: '8px', letterSpacing: '0.24em', textTransform: 'uppercase', color: '#9a7042', marginBottom: '6px' }}>{s.exclusiveWorkEyebrow || 'Bespoke · Made to Measure'}</div>
+          <div style={{ fontFamily: 'Georgia,serif', fontSize: '20px', marginBottom: '12px' }}>{s.exclusiveWorkTitle || 'Our Exclusive Work'}</div>
+          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${s.exclusiveWorkColumns || 3},1fr)`, gap: '6px' }}>
+            {items.length ? items.map((item, index) => (
+              <div key={index} style={{ background: '#ddd', aspectRatio: s.exclusiveWorkAspect || '3/4', overflow: 'hidden' }}>
+                <img src={item.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              </div>
+            )) : [0, 1, 2].map(index => <div key={index} style={{ background: '#ddd', aspectRatio: '3/4' }} />)}
+          </div>
+        </div>
+      )
+    },
   },
   {
     id: 'collections', label: 'Collections Grid', accent: '#8b7b5a',
@@ -3208,7 +3207,7 @@ function AdminPageStudio() {
   const [dropIdx, setDropIdx] = useState(null)
 
   // --- Home section order & visibility ---
-  const [homeSectionOrder, setHomeSectionOrder] = useState(() => settings?.homeSectionOrder || DEFAULT_HOME_ORDER)
+  const [homeSectionOrder, setHomeSectionOrder] = useState(() => normalizeHomeSectionOrder(settings?.homeSectionOrder))
   const [homeSectionVisibility, setHomeSectionVisibility] = useState(() => settings?.homeSectionVisibility || {})
 
   // --- Fetched data for previewing live components ---
@@ -3216,12 +3215,24 @@ function AdminPageStudio() {
   useEffect(() => { api('/products?featured=true').then(r => setFeatured(r.products.slice(0, 12))).catch(() => { }) }, [api])
 
   useEffect(() => setLocalSettings({ ...settings }), [settings])
-  useEffect(() => { if (settings?.homeSectionOrder) setHomeSectionOrder(settings.homeSectionOrder) }, [settings])
+  useEffect(() => { setHomeSectionOrder(normalizeHomeSectionOrder(settings?.homeSectionOrder)) }, [settings])
   useEffect(() => { if (settings?.homeSectionVisibility) setHomeSectionVisibility(settings.homeSectionVisibility) }, [settings])
 
   // ---- HOME PAGE SECTION HANDLERS ----
   const selectedHomeDef = HOME_SECTION_DEFS.find(d => d.id === selectedSectionId)
   const setHomeField = (key, val) => setLocalSettings(s => ({ ...s, [key]: val }))
+  const updateExclusiveWorkItem = (index, patch) => {
+    const items = Array.isArray(localSettings.exclusiveWorkItems) ? localSettings.exclusiveWorkItems : []
+    setHomeField('exclusiveWorkItems', items.map((item, itemIndex) => itemIndex === index ? { ...item, ...patch } : item))
+  }
+  const addExclusiveWorkItem = () => {
+    const items = Array.isArray(localSettings.exclusiveWorkItems) ? localSettings.exclusiveWorkItems : []
+    if (items.length < 8) setHomeField('exclusiveWorkItems', [...items, { image: '', description: '' }])
+  }
+  const removeExclusiveWorkItem = (index) => {
+    const items = Array.isArray(localSettings.exclusiveWorkItems) ? localSettings.exclusiveWorkItems : []
+    setHomeField('exclusiveWorkItems', items.filter((_, itemIndex) => itemIndex !== index))
+  }
 
   const orderedHomeDefs = homeSectionOrder
     .map(id => HOME_SECTION_DEFS.find(d => d.id === id))
@@ -3544,7 +3555,45 @@ function AdminPageStudio() {
                   {selectedHomeDef.fields.map(f => (
                     <div key={f.key}>
                       <Label className="text-[10px] tracking-editorial uppercase text-muted-foreground block mb-1.5">{f.label}</Label>
-                      {f.type === 'select' ? (
+                      {f.type === 'work-gallery' ? (
+                        <div className="space-y-3">
+                          {(Array.isArray(localSettings[f.key]) ? localSettings[f.key] : []).map((item, index) => (
+                            <div key={index} className="space-y-2 border border-border p-3">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-xs font-medium">Work {index + 1}</span>
+                                <Button type="button" variant="ghost" size="sm" className="h-7 rounded-none px-2 text-destructive" onClick={() => removeExclusiveWorkItem(index)} aria-label={`Remove work ${index + 1}`}>
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                              <Input type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="rounded-none text-xs" onChange={e => {
+                                const file = e.target.files?.[0]
+                                if (!file) return
+                                if (!['image/png', 'image/jpeg', 'image/webp', 'image/gif'].includes(file.type)) {
+                                  toast.error('Choose a PNG, JPG, WEBP, or GIF image')
+                                  e.target.value = ''
+                                  return
+                                }
+                                if (file.size > 1024 * 1024) {
+                                  toast.error('Each work image must be 1 MB or smaller')
+                                  e.target.value = ''
+                                  return
+                                }
+                                const reader = new FileReader()
+                                reader.onload = () => updateExclusiveWorkItem(index, { image: String(reader.result) })
+                                reader.onerror = () => toast.error('Could not read the work image')
+                                reader.readAsDataURL(file)
+                              }} />
+                              <Input className="rounded-none text-sm" value={item.image?.startsWith('data:') ? '' : item.image || ''} onChange={e => updateExclusiveWorkItem(index, { image: e.target.value })} placeholder="Or paste an image URL" />
+                              {item.image && <img src={item.image} alt="Work preview" className="max-h-36 w-full border border-border object-cover" />}
+                              <Textarea rows={2} maxLength={240} className="rounded-none text-sm" value={item.description || ''} onChange={e => updateExclusiveWorkItem(index, { description: e.target.value })} placeholder="Short description" />
+                            </div>
+                          ))}
+                          <Button type="button" variant="outline" disabled={(Array.isArray(localSettings[f.key]) ? localSettings[f.key].length : 0) >= 8} className="w-full rounded-none text-xs" onClick={addExclusiveWorkItem}>
+                            <Plus className="mr-1.5 h-3.5 w-3.5" />Add Work Image
+                          </Button>
+                          <p className="text-[10px] text-muted-foreground">Upload an image up to 1 MB or paste its URL. Up to 8 entries.</p>
+                        </div>
+                      ) : f.type === 'select' ? (
                         <Select value={String(localSettings[f.key] || (f.options && f.options[0]?.value) || '')} onValueChange={v => setHomeField(f.key, v)}>
                           <SelectTrigger className="rounded-none text-sm h-9"><SelectValue /></SelectTrigger>
                           <SelectContent>{(f.options || []).map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
