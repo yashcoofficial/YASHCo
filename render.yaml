@@ -1,18 +1,35 @@
 services:
   - type: web
+    name: YASHCo
+    runtime: node
+    plan: free
+    region: ohio
+    buildCommand: yarn install && yarn build
+    startCommand: node .next/standalone/server.js
+    healthCheckPath: /
+    autoDeployTrigger: commit
+    domains:
+      - yashatelier.store
+      - www.yashatelier.store
+    envVars:
+      - key: API_SERVICE_URL
+        value: https://yashco-api.onrender.com
+  - type: web
     name: yashco-api
     runtime: docker
     plan: free
+    region: ohio
     dockerfilePath: ./services/api/Dockerfile
     dockerContext: ./services/api
     healthCheckPath: /api/health
+    autoDeployTrigger: commit
     envVars:
       - key: MONGO_URL
         sync: false
       - key: DB_NAME
         sync: false
       - key: JWT_SECRET
-        sync: false
+        generateValue: true
       - key: APP_URL
         value: https://www.yashatelier.store
       - key: COOKIE_SECURE
