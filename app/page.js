@@ -831,7 +831,19 @@ function PromoCodeField({ subtotal, currencySymbol }) {
 }
 
 // ---------- Home ----------
-const DEFAULT_HOME_ORDER = ['hero', 'brand-worlds', 'collections', 'featured', 'lookbook', 'about', 'concierge-cta', 'feedback']
+const DEFAULT_HOME_ORDER = ['hero', 'brand-worlds', 'collections', 'featured', 'lookbook', 'bespoke', 'about', 'concierge-cta', 'feedback']
+
+function ensureBespokeSectionOrder(order) {
+  if (!Array.isArray(order)) return DEFAULT_HOME_ORDER
+  if (order.includes('bespoke')) return order
+  const lookbookIndex = order.indexOf('lookbook')
+  if (lookbookIndex >= 0) {
+    return [...order.slice(0, lookbookIndex + 1), 'bespoke', ...order.slice(lookbookIndex + 1)]
+  }
+  const aboutIndex = order.indexOf('about')
+  const insertIndex = aboutIndex >= 0 ? aboutIndex : order.length
+  return [...order.slice(0, insertIndex), 'bespoke', ...order.slice(insertIndex)]
+}
 
 function HomeView() {
   const { settings, collections, navigate, api, setFeedbackOpen } = useApp()
@@ -872,7 +884,8 @@ function HomeView() {
     const withBrandWorlds = savedSectionOrder.includes('brand-worlds')
       ? savedSectionOrder
       : [...savedSectionOrder.slice(0, 1), 'brand-worlds', ...savedSectionOrder.slice(1)]
-    return withBrandWorlds.includes('feedback') ? withBrandWorlds : [...withBrandWorlds, 'feedback']
+    const withBespoke = ensureBespokeSectionOrder(withBrandWorlds)
+    return withBespoke.includes('feedback') ? withBespoke : [...withBespoke, 'feedback']
   }, [savedSectionOrder])
   const vis = settings.homeSectionVisibility || {}
   const visibleCollectionLinks = useMemo(
@@ -1035,6 +1048,28 @@ function HomeView() {
           </div>
         </section>
       )
+      case 'bespoke': {
+        const bespokeImages = Array.isArray(settings.bespokeImages) ? settings.bespokeImages.filter(Boolean) : []
+        if (!bespokeImages.length) return null
+        return (
+          <section key="bespoke" className="bg-[#f5f2ed] px-4 py-20 sm:px-6 md:py-28">
+            <div className="mx-auto max-w-[1400px]">
+              <div className="mx-auto mb-12 max-w-2xl text-center md:mb-16">
+                <div className="mb-4 text-[11px] uppercase tracking-luxe text-accent">{settings.bespokeEyebrow || 'Made exclusively for you'}</div>
+                <h2 className="font-serif text-4xl md:text-5xl">{settings.bespokeTitle || 'The Bespoke Collection'}</h2>
+                {settings.bespokeDescription && <p className="mt-5 whitespace-pre-line text-sm leading-relaxed text-muted-foreground">{settings.bespokeDescription}</p>}
+              </div>
+              <div className={cx('mx-auto grid max-w-6xl grid-cols-1 gap-4 sm:grid-cols-2 md:gap-6 lg:grid-cols-3', bespokeImages.length === 1 && 'max-w-2xl')}>
+                {bespokeImages.map((image, index) => (
+                  <div key={`${image}-${index}`} className="img-zoom overflow-hidden bg-muted">
+                    <img src={image} alt={`Bespoke design ${index + 1}`} className="aspect-[4/5] w-full object-cover" loading="lazy" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+        )
+      }
       case 'about': return (
         <section key="about" className={cx(
           aboutBg === 'dark' ? 'bg-primary text-primary-foreground' : 'bg-muted/40',
@@ -3122,6 +3157,30 @@ const HOME_SECTION_DEFS = [
     )
   },
   {
+    id: 'bespoke', label: 'The Bespoke Collection', accent: '#8b6f4e',
+    fields: [
+      { key: 'bespokeEyebrow', label: 'Eyebrow Label', type: 'text', placeholder: 'Made exclusively for you' },
+      { key: 'bespokeTitle', label: 'Section Title', type: 'text', placeholder: 'The Bespoke Collection' },
+      { key: 'bespokeDescription', label: 'Description', type: 'textarea', placeholder: 'A glimpse of custom work created by our ateliers…' },
+      { key: 'bespokeImages', label: 'Work Images (one URL per line)', type: 'textarea-list', placeholder: 'https://...' },
+    ],
+    preview: (s) => {
+      const images = Array.isArray(s.bespokeImages) ? s.bespokeImages.filter(Boolean) : []
+      return (
+        <div style={{ background: '#f5f2ed', padding: '20px 16px', textAlign: 'center' }}>
+          <div style={{ fontSize: '8px', color: '#9a7042', letterSpacing: '0.3em', textTransform: 'uppercase', marginBottom: '6px' }}>{s.bespokeEyebrow || 'Made exclusively for you'}</div>
+          <div style={{ fontFamily: 'Georgia,serif', fontSize: '17px', marginBottom: '6px' }}>{s.bespokeTitle || 'The Bespoke Collection'}</div>
+          <div style={{ color: '#6b7280', fontSize: '8px', lineHeight: 1.5, margin: '0 auto 12px', maxWidth: '260px' }}>{s.bespokeDescription || 'Showcase custom work created by your ateliers.'}</div>
+          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(Math.max(images.length, 1), 3)}, 1fr)`, gap: '6px' }}>
+            {images.length
+              ? images.slice(0, 3).map((image, index) => <img key={`${image}-${index}`} src={image} alt="" style={{ width: '100%', aspectRatio: '4/5', objectFit: 'cover', background: '#ddd' }} />)
+              : [0, 1, 2].map(index => <div key={index} style={{ aspectRatio: '4/5', background: '#ddd' }} />)}
+          </div>
+        </div>
+      )
+    },
+  },
+  {
     id: 'about', label: 'About / Maison', accent: '#141414',
     fields: [
       { key: 'aboutEyebrow', label: 'Eyebrow Label', type: 'text', placeholder: 'Maison' },
@@ -3208,7 +3267,7 @@ function AdminPageStudio() {
   const [dropIdx, setDropIdx] = useState(null)
 
   // --- Home section order & visibility ---
-  const [homeSectionOrder, setHomeSectionOrder] = useState(() => settings?.homeSectionOrder || DEFAULT_HOME_ORDER)
+  const [homeSectionOrder, setHomeSectionOrder] = useState(() => ensureBespokeSectionOrder(settings?.homeSectionOrder || DEFAULT_HOME_ORDER))
   const [homeSectionVisibility, setHomeSectionVisibility] = useState(() => settings?.homeSectionVisibility || {})
 
   // --- Fetched data for previewing live components ---
@@ -3216,7 +3275,7 @@ function AdminPageStudio() {
   useEffect(() => { api('/products?featured=true').then(r => setFeatured(r.products.slice(0, 12))).catch(() => { }) }, [api])
 
   useEffect(() => setLocalSettings({ ...settings }), [settings])
-  useEffect(() => { if (settings?.homeSectionOrder) setHomeSectionOrder(settings.homeSectionOrder) }, [settings])
+  useEffect(() => { if (settings?.homeSectionOrder) setHomeSectionOrder(ensureBespokeSectionOrder(settings.homeSectionOrder)) }, [settings])
   useEffect(() => { if (settings?.homeSectionVisibility) setHomeSectionVisibility(settings.homeSectionVisibility) }, [settings])
 
   // ---- HOME PAGE SECTION HANDLERS ----
