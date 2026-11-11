@@ -43,9 +43,8 @@ const nextConfig = {
     ];
   },
   async rewrites() {
-    const productionApiOrigin = process.env.VERCEL ? 'https://yashco-api.onrender.com' : 'http://localhost:4000';
-    const apiOrigin = process.env.API_SERVICE_URL || productionApiOrigin;
-    return [{ source: '/api/:path*', destination: `${apiOrigin}/api/:path*` }];
+    if (!process.env.API_SERVICE_URL) return [];
+    return [{ source: '/api/:path*', destination: `${process.env.API_SERVICE_URL}/api/:path*` }];
   },
 };
 

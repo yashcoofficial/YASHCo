@@ -106,14 +106,3 @@ API_SERVICE_URL=http://localhost:4000 npm run dev:web
 
 Without `API_SERVICE_URL`, Next keeps its built-in API route enabled for backwards-compatible single-process development. Both services use the existing `MONGO_URL`, `DB_NAME`, and authentication/email environment variables.
 
-## Deploy frontend, API, and database separately on Railway
-
-Create three Railway services from this repository:
-
-1. Add Railway's MongoDB database service.
-2. Add the API service with **Root Directory** `/services/api`; Railway uses `services/api/Dockerfile`.
-3. Add the website service from the repository root with the Node runtime, build command `npm ci && npm run build`, and start command `npm run start`.
-
-Deploy MongoDB and the API first. Set the API's `MONGO_URL` to a Railway variable reference to the database service's `MONGO_URL`. Set `DB_NAME`, generate a private `JWT_SECRET`, and configure `APP_URL` and `COOKIE_SECURE` for the website's HTTPS domain. Give the API a public domain, then set the website's `API_SERVICE_URL` to that HTTPS origin and redeploy the website so Next.js configures the `/api/*` proxy.
-
-See [services/api/README.md](services/api/README.md) for the full setup and a note about migrating data into a new MongoDB service.
