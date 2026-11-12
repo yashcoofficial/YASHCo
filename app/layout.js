@@ -17,7 +17,16 @@ const inter = Inter({
 
 export const metadata = {
   title: 'YASH — Own Every Moment',
-  description: 'YASH Maison — A curated house of quiet luxury. Own Every Moment.',
+  description: 'Discover YASH Atelier: considered menswear, premium linen, refined tailoring and timeless essentials. Own Every Moment.',
+  metadataBase: new URL('https://www.yashatelier.store'),
+  openGraph: {
+    title: 'YASH Atelier — Own Every Moment',
+    description: 'Premium menswear, elevated essentials and considered design.',
+    siteName: 'YASH Atelier',
+    type: 'website',
+    locale: 'en_IN',
+  },
+  robots: { index: true, follow: true },
   icons: {
     icon: [
       { url: '/favicon.ico', type: 'image/x-icon' },
