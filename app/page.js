@@ -33,6 +33,30 @@ const useApp = () => useContext(AppCtx)
 // ---------- Helpers ----------
 const money = (n, sym = '₹') => `${sym}${(n || 0).toLocaleString('en-IN')}`
 const cx = (...a) => a.filter(Boolean).join(' ')
+const MAX_ADMIN_IMAGE_SIZE = 2 * 1024 * 1024
+const MAX_ADMIN_PRODUCT_IMAGES_SIZE = 4 * 1024 * 1024
+
+function readAdminImage(file) {
+  const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
+  if (!allowedTypes.includes(file.type)) {
+    return Promise.reject(new Error('Choose a PNG, JPG, WEBP, or GIF image'))
+  }
+  if (file.size > MAX_ADMIN_IMAGE_SIZE) {
+    return Promise.reject(new Error('Images must be 2 MB or smaller'))
+  }
+
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result))
+    reader.onerror = () => reject(new Error('Could not read the selected image'))
+    reader.readAsDataURL(file)
+  })
+}
+
+function getAdminImageSize(value) {
+  const base64 = value?.match(/^data:image\/[^;]+;base64,(.*)$/)?.[1]
+  return base64 ? Math.floor(base64.length * 3 / 4) : 0
+}
 
 function getNavigationCategories(link, collections = []) {
   const pageKey = link?.pageKey || link?.page
@@ -1050,7 +1074,10 @@ function HomeView() {
       )
       case 'bespoke': {
         const bespokeImages = Array.isArray(settings.bespokeImages) ? settings.bespokeImages.filter(Boolean) : []
-        if (!bespokeImages.length) return null
+        const bespokeCollections = Array.isArray(settings.bespokeCollections)
+          ? settings.bespokeCollections.filter(collection => collection && (collection.name || collection.description || (Array.isArray(collection.images) && collection.images.some(Boolean))))
+          : []
+        if (!bespokeImages.length && !bespokeCollections.length) return null
         return (
           <section key="bespoke" className="bg-[#f5f2ed] px-4 py-20 sm:px-6 md:py-28">
             <div className="mx-auto max-w-[1400px]">
@@ -1059,13 +1086,38 @@ function HomeView() {
                 <h2 className="font-serif text-4xl md:text-5xl">{settings.bespokeTitle || 'The Bespoke Collection'}</h2>
                 {settings.bespokeDescription && <p className="mt-5 whitespace-pre-line text-sm leading-relaxed text-muted-foreground">{settings.bespokeDescription}</p>}
               </div>
-              <div className={cx('mx-auto grid max-w-6xl grid-cols-1 gap-4 sm:grid-cols-2 md:gap-6 lg:grid-cols-3', bespokeImages.length === 1 && 'max-w-2xl')}>
-                {bespokeImages.map((image, index) => (
-                  <div key={`${image}-${index}`} className="img-zoom overflow-hidden bg-muted">
-                    <img src={image} alt={`Bespoke design ${index + 1}`} className="aspect-[4/5] w-full object-cover" loading="lazy" />
-                  </div>
-                ))}
-              </div>
+              {bespokeCollections.length ? (
+                <div className="mx-auto max-w-6xl space-y-14">
+                  {bespokeCollections.map((collection, index) => {
+                    const images = Array.isArray(collection.images) ? collection.images.filter(Boolean) : []
+                    return (
+                      <article key={`${collection.name || 'bespoke'}-${index}`}>
+                        <div className="mx-auto mb-6 max-w-2xl text-center">
+                          {collection.name && <h3 className="font-serif text-2xl md:text-3xl">{collection.name}</h3>}
+                          {collection.description && <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-muted-foreground">{collection.description}</p>}
+                        </div>
+                        {images.length > 0 && (
+                          <div className={cx('mx-auto grid grid-cols-1 gap-4 sm:grid-cols-2 md:gap-6 lg:grid-cols-3', images.length === 1 && 'max-w-2xl')}>
+                            {images.map((image, imageIndex) => (
+                              <div key={`${image}-${imageIndex}`} className="img-zoom overflow-hidden bg-muted">
+                                <img src={image} alt={`${collection.name || 'Bespoke collection'} design ${imageIndex + 1}`} className="aspect-[4/5] w-full object-cover" loading="lazy" />
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </article>
+                    )
+                  })}
+                </div>
+              ) : (
+                <div className={cx('mx-auto grid max-w-6xl grid-cols-1 gap-4 sm:grid-cols-2 md:gap-6 lg:grid-cols-3', bespokeImages.length === 1 && 'max-w-2xl')}>
+                  {bespokeImages.map((image, index) => (
+                    <div key={`${image}-${index}`} className="img-zoom overflow-hidden bg-muted">
+                      <img src={image} alt={`Bespoke design ${index + 1}`} className="aspect-[4/5] w-full object-cover" loading="lazy" />
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </section>
         )
@@ -2424,7 +2476,10 @@ function AdminProducts() {
           <DialogHeader><DialogTitle className="font-serif text-2xl">{editing?.id ? 'Edit Product' : 'New Product'}</DialogTitle></DialogHeader>
           {editing && <div className="space-y-4">
             <Input placeholder="Name" className="rounded-none" value={editing.name} onChange={e => setEditing({ ...editing, name: e.target.value })} />
-            <Textarea placeholder="Description" rows={3} className="rounded-none" value={editing.description} onChange={e => setEditing({ ...editing, description: e.target.value })} />
+            <div>
+              <Label htmlFor="admin-product-description" className="text-xs tracking-editorial uppercase">Product Description</Label>
+              <Textarea id="admin-product-description" placeholder="Describe the product, its materials, fit, and details" rows={5} className="rounded-none mt-1" value={editing.description || ''} onChange={e => setEditing({ ...editing, description: e.target.value })} />
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <Select value={collections.find(c => c.slug === editing.collection)?.parentSlug || editing.collection} onValueChange={v => setEditing({ ...editing, collection: v })}>
                 <SelectTrigger className="rounded-none"><SelectValue placeholder="Collection" /></SelectTrigger>
@@ -2445,14 +2500,43 @@ function AdminProducts() {
               <Input type="number" placeholder="Low stock threshold" className="rounded-none" value={editing.lowStockThreshold} onChange={e => setEditing({ ...editing, lowStockThreshold: e.target.value })} />
             </div>
             <div>
-              <Label className="text-xs">Images (URLs)</Label>
+              <Label className="text-xs tracking-editorial uppercase">Product Images</Label>
+              <p className="text-xs text-muted-foreground mt-1">Upload PNG, JPG, WEBP, or GIF files up to 2 MB each (4 MB total), or enter an image URL.</p>
               {editing.images.map((img, i) => (
-                <div key={i} className="flex gap-2 mt-2">
-                  <Input className="rounded-none" value={img} onChange={e => { const a = [...editing.images]; a[i] = e.target.value; setEditing({ ...editing, images: a }) }} />
-                  <Button variant="outline" size="sm" className="rounded-none" onClick={() => { const a = editing.images.filter((_, x) => x !== i); setEditing({ ...editing, images: a.length ? a : [''] }) }}><X className="w-3.5 h-3.5" /></Button>
+                <div key={i} className="mt-3 border border-border p-3">
+                  <div className="flex gap-2">
+                    <Input className="rounded-none" aria-label={`Product image ${i + 1} URL`} placeholder="https://..." value={img?.startsWith('data:') ? '' : img || ''} onChange={e => { const a = [...editing.images]; a[i] = e.target.value; setEditing({ ...editing, images: a }) }} />
+                    <Button type="button" variant="outline" size="sm" className="rounded-none" aria-label={`Remove product image ${i + 1}`} onClick={() => { const a = editing.images.filter((_, x) => x !== i); setEditing({ ...editing, images: a.length ? a : [''] }) }}><X className="w-3.5 h-3.5" /></Button>
+                  </div>
+                  <Input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp,image/gif"
+                    aria-label={`Upload product image ${i + 1}`}
+                    className="rounded-none mt-2"
+                    onChange={async event => {
+                      const input = event.currentTarget
+                      const file = input.files?.[0]
+                      if (!file) return
+                      try {
+                        const uploadedSize = editing.images.reduce((total, image, index) => total + (index === i ? 0 : getAdminImageSize(image)), 0)
+                        if (uploadedSize + file.size > MAX_ADMIN_PRODUCT_IMAGES_SIZE) {
+                          throw new Error('Product image uploads must total 4 MB or less')
+                        }
+                        const image = await readAdminImage(file)
+                        const images = [...editing.images]
+                        images[i] = image
+                        setEditing({ ...editing, images })
+                      } catch (error) {
+                        toast.error(error.message)
+                      } finally {
+                        input.value = ''
+                      }
+                    }}
+                  />
+                  {img && <img src={img} alt={`Product image ${i + 1} preview`} className="mt-3 h-32 w-24 border border-border bg-muted object-contain" />}
                 </div>
               ))}
-              <Button variant="outline" size="sm" className="rounded-none mt-2" onClick={() => setEditing({ ...editing, images: [...editing.images, ''] })}>+ Add Image</Button>
+              <Button type="button" variant="outline" size="sm" className="rounded-none mt-2" onClick={() => setEditing({ ...editing, images: [...editing.images, ''] })}>+ Add Image</Button>
             </div>
             <div className="space-y-2 border-t border-border pt-4">
               <div>
@@ -2619,8 +2703,29 @@ function AdminCollections() {
             <Input placeholder="Name" className="rounded-none" value={editing.name} onChange={e => setEditing({ ...editing, name: e.target.value })} />
             <Input placeholder="Slug" className="rounded-none" value={editing.slug} onChange={e => setEditing({ ...editing, slug: e.target.value })} />
             {editing.parentSlug && <div className="text-xs text-muted-foreground">Category of {topLevelCollections.find(collection => collection.slug === editing.parentSlug)?.name || editing.parentSlug}</div>}
-            <Input placeholder="Image URL" className="rounded-none" value={editing.image} onChange={e => setEditing({ ...editing, image: e.target.value })} />
-            <Textarea placeholder="Description" className="rounded-none" value={editing.description} onChange={e => setEditing({ ...editing, description: e.target.value })} />
+            <div>
+              <Label className="text-xs tracking-editorial uppercase">{editing.parentSlug ? 'Category Image' : 'Collection Image'}</Label>
+              <Input type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="rounded-none mt-1" onChange={async event => {
+                const input = event.currentTarget
+                const file = input.files?.[0]
+                if (!file) return
+                try {
+                  const image = await readAdminImage(file)
+                  setEditing(current => current ? { ...current, image } : current)
+                } catch (error) {
+                  toast.error(error.message)
+                } finally {
+                  input.value = ''
+                }
+              }} />
+              <p className="text-xs text-muted-foreground mt-1">PNG, JPG, WEBP, or GIF up to 2 MB, or use an image URL below.</p>
+              <Input aria-label="Collection image URL" placeholder="Image URL (https://...)" className="rounded-none mt-2" value={editing.image?.startsWith('data:') ? '' : editing.image || ''} onChange={e => setEditing({ ...editing, image: e.target.value })} />
+              {editing.image && <img src={editing.image} alt="Collection image preview" className="mt-2 max-h-40 w-auto border border-border object-contain" />}
+            </div>
+            <div>
+              <Label htmlFor="admin-collection-description" className="text-xs tracking-editorial uppercase">Description</Label>
+              <Textarea id="admin-collection-description" placeholder="Describe this collection or category" rows={4} className="rounded-none mt-1" value={editing.description || ''} onChange={e => setEditing({ ...editing, description: e.target.value })} />
+            </div>
             <Input type="number" placeholder="Order" className="rounded-none" value={editing.order} onChange={e => setEditing({ ...editing, order: e.target.value })} />
           </div>}
           <DialogFooter><Button className="rounded-none" onClick={save}>Save</Button></DialogFooter>
@@ -3162,20 +3267,36 @@ const HOME_SECTION_DEFS = [
       { key: 'bespokeEyebrow', label: 'Eyebrow Label', type: 'text', placeholder: 'Made exclusively for you' },
       { key: 'bespokeTitle', label: 'Section Title', type: 'text', placeholder: 'The Bespoke Collection' },
       { key: 'bespokeDescription', label: 'Description', type: 'textarea', placeholder: 'A glimpse of custom work created by our ateliers…' },
-      { key: 'bespokeImages', label: 'Work Images (one URL per line)', type: 'textarea-list', placeholder: 'https://...' },
+      { key: 'bespokeImages', label: 'Legacy Work Images (used until collections are added)', type: 'textarea-list', placeholder: 'https://...' },
+      { key: 'bespokeCollections', label: 'Individual Collections', type: 'bespoke-collections' },
     ],
     preview: (s) => {
       const images = Array.isArray(s.bespokeImages) ? s.bespokeImages.filter(Boolean) : []
+      const collections = Array.isArray(s.bespokeCollections)
+        ? s.bespokeCollections.filter(collection => collection && (collection.name || collection.description || (Array.isArray(collection.images) && collection.images.some(Boolean))))
+        : []
       return (
         <div style={{ background: '#f5f2ed', padding: '20px 16px', textAlign: 'center' }}>
           <div style={{ fontSize: '8px', color: '#9a7042', letterSpacing: '0.3em', textTransform: 'uppercase', marginBottom: '6px' }}>{s.bespokeEyebrow || 'Made exclusively for you'}</div>
           <div style={{ fontFamily: 'Georgia,serif', fontSize: '17px', marginBottom: '6px' }}>{s.bespokeTitle || 'The Bespoke Collection'}</div>
           <div style={{ color: '#6b7280', fontSize: '8px', lineHeight: 1.5, margin: '0 auto 12px', maxWidth: '260px' }}>{s.bespokeDescription || 'Showcase custom work created by your ateliers.'}</div>
-          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(Math.max(images.length, 1), 3)}, 1fr)`, gap: '6px' }}>
-            {images.length
-              ? images.slice(0, 3).map((image, index) => <img key={`${image}-${index}`} src={image} alt="" style={{ width: '100%', aspectRatio: '4/5', objectFit: 'cover', background: '#ddd' }} />)
-              : [0, 1, 2].map(index => <div key={index} style={{ aspectRatio: '4/5', background: '#ddd' }} />)}
-          </div>
+          {collections.length
+            ? collections.map((collection, index) => (
+              <div key={`${collection.name || 'bespoke'}-${index}`} style={{ marginTop: '12px' }}>
+                {collection.name && <div style={{ fontFamily: 'Georgia,serif', fontSize: '12px', marginBottom: '4px' }}>{collection.name}</div>}
+                {collection.description && <div style={{ color: '#6b7280', fontSize: '7px', lineHeight: 1.4, margin: '0 auto 6px', maxWidth: '260px' }}>{collection.description}</div>}
+                <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(Math.max((Array.isArray(collection.images) ? collection.images : []).filter(Boolean).length, 1), 3)}, 1fr)`, gap: '6px' }}>
+                  {(Array.isArray(collection.images) ? collection.images : []).filter(Boolean).slice(0, 3).map((image, imageIndex) => <img key={`${image}-${imageIndex}`} src={image} alt="" style={{ width: '100%', aspectRatio: '4/5', objectFit: 'cover', background: '#ddd' }} />)}
+                </div>
+              </div>
+            ))
+            : (
+              <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(Math.max(images.length, 1), 3)}, 1fr)`, gap: '6px' }}>
+                {images.length
+                  ? images.slice(0, 3).map((image, index) => <img key={`${image}-${index}`} src={image} alt="" style={{ width: '100%', aspectRatio: '4/5', objectFit: 'cover', background: '#ddd' }} />)
+                  : [0, 1, 2].map(index => <div key={index} style={{ aspectRatio: '4/5', background: '#ddd' }} />)}
+              </div>
+            )}
         </div>
       )
     },
@@ -3621,6 +3742,37 @@ function AdminPageStudio() {
                         <Textarea rows={4} className="rounded-none text-sm" value={localSettings[f.key] || ''} onChange={e => setHomeField(f.key, e.target.value)} placeholder={f.placeholder} />
                       ) : f.type === 'textarea-list' ? (
                         <Textarea rows={4} className="rounded-none text-sm font-mono text-xs" value={(localSettings[f.key] || []).join('\n')} onChange={e => setHomeField(f.key, e.target.value.split('\n').filter(Boolean))} placeholder={f.placeholder} />
+                      ) : f.type === 'bespoke-collections' ? (
+                        <div className="space-y-3">
+                          {(Array.isArray(localSettings[f.key]) ? localSettings[f.key] : []).map((collection, index) => (
+                            <div key={index} className="space-y-2 border border-border p-3">
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs text-muted-foreground">Collection {index + 1}</span>
+                                <Button type="button" size="icon" variant="ghost" className="h-7 w-7 rounded-none text-destructive" aria-label={`Remove bespoke collection ${index + 1}`} onClick={() => setHomeField(f.key, localSettings[f.key].filter((_, itemIndex) => itemIndex !== index))}>
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                              <Input className="rounded-none text-sm" value={collection.name || ''} onChange={event => {
+                                const nextCollections = [...localSettings[f.key]]
+                                nextCollections[index] = { ...collection, name: event.target.value }
+                                setHomeField(f.key, nextCollections)
+                              }} placeholder="Collection name" aria-label={`Bespoke collection ${index + 1} name`} />
+                              <Textarea rows={3} className="rounded-none text-sm" value={collection.description || ''} onChange={event => {
+                                const nextCollections = [...localSettings[f.key]]
+                                nextCollections[index] = { ...collection, description: event.target.value }
+                                setHomeField(f.key, nextCollections)
+                              }} placeholder="Optional collection description" aria-label={`Bespoke collection ${index + 1} description`} />
+                              <Textarea rows={3} className="rounded-none text-xs font-mono" value={(Array.isArray(collection.images) ? collection.images : []).join('\n')} onChange={event => {
+                                const nextCollections = [...localSettings[f.key]]
+                                nextCollections[index] = { ...collection, images: event.target.value.split('\n').filter(Boolean) }
+                                setHomeField(f.key, nextCollections)
+                              }} placeholder="Image URLs, one per line" aria-label={`Bespoke collection ${index + 1} images`} />
+                            </div>
+                          ))}
+                          <Button type="button" variant="outline" className="w-full rounded-none text-xs" onClick={() => setHomeField(f.key, [...(Array.isArray(localSettings[f.key]) ? localSettings[f.key] : []), { name: '', description: '', images: [] }])}>
+                            <Plus className="mr-1.5 h-3.5 w-3.5" />Add Bespoke Collection
+                          </Button>
+                        </div>
                       ) : (
                         <Input className="rounded-none text-sm h-9" value={localSettings[f.key] || ''} onChange={e => setHomeField(f.key, e.target.value)} placeholder={f.placeholder} />
                       )}
