@@ -35,6 +35,7 @@ const money = (n, sym = '₹') => `${sym}${(n || 0).toLocaleString('en-IN')}`
 const cx = (...a) => a.filter(Boolean).join(' ')
 const MAX_ADMIN_IMAGE_SIZE = 2 * 1024 * 1024
 const MAX_ADMIN_PRODUCT_IMAGES_SIZE = 4 * 1024 * 1024
+const MAX_ADMIN_BESPOKE_IMAGES_SIZE = 4 * 1024 * 1024
 
 function readAdminImage(file) {
   const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
@@ -3762,11 +3763,80 @@ function AdminPageStudio() {
                                 nextCollections[index] = { ...collection, description: event.target.value }
                                 setHomeField(f.key, nextCollections)
                               }} placeholder="Optional collection description" aria-label={`Bespoke collection ${index + 1} description`} />
-                              <Textarea rows={3} className="rounded-none text-xs font-mono" value={(Array.isArray(collection.images) ? collection.images : []).join('\n')} onChange={event => {
-                                const nextCollections = [...localSettings[f.key]]
-                                nextCollections[index] = { ...collection, images: event.target.value.split('\n').filter(Boolean) }
-                                setHomeField(f.key, nextCollections)
-                              }} placeholder="Image URLs, one per line" aria-label={`Bespoke collection ${index + 1} images`} />
+                              <div className="space-y-2">
+                                <span className="block text-[10px] tracking-editorial uppercase text-muted-foreground">Collection Images</span>
+                                {(Array.isArray(collection.images) ? collection.images : []).map((image, imageIndex) => (
+                                  <div key={imageIndex} className="border border-border p-2.5 space-y-2">
+                                    <div className="flex gap-2">
+                                      <Input className="rounded-none text-xs" value={image?.startsWith('data:') ? '' : image || ''} onChange={event => {
+                                        const nextCollections = [...localSettings[f.key]]
+                                        const images = Array.isArray(collection.images) ? [...collection.images] : []
+                                        images[imageIndex] = event.target.value
+                                        nextCollections[index] = { ...collection, images }
+                                        setHomeField(f.key, nextCollections)
+                                      }} placeholder="Image URL (https://...)" aria-label={`Bespoke collection ${index + 1} image ${imageIndex + 1} URL`} />
+                                      <Button type="button" size="icon" variant="ghost" className="h-9 w-9 shrink-0 rounded-none text-destructive" aria-label={`Remove image ${imageIndex + 1} from bespoke collection ${index + 1}`} onClick={() => {
+                                        const nextCollections = [...localSettings[f.key]]
+                                        const images = (Array.isArray(collection.images) ? collection.images : []).filter((_, itemIndex) => itemIndex !== imageIndex)
+                                        nextCollections[index] = { ...collection, images }
+                                        setHomeField(f.key, nextCollections)
+                                      }}>
+                                        <X className="h-3.5 w-3.5" />
+                                      </Button>
+                                    </div>
+                                    <Input
+                                      type="file"
+                                      accept="image/png,image/jpeg,image/webp,image/gif"
+                                      className="rounded-none text-xs"
+                                      aria-label={`Upload image ${imageIndex + 1} for bespoke collection ${index + 1}`}
+                                      onChange={async event => {
+                                        const input = event.currentTarget
+                                        const file = input.files?.[0]
+                                        if (!file) return
+                                        try {
+                                          const collections = Array.isArray(localSettings[f.key]) ? localSettings[f.key] : []
+                                          const uploadedSize = collections.reduce((total, item, collectionIndex) => {
+                                            const itemImages = Array.isArray(item.images) ? item.images : []
+                                            return total + itemImages.reduce((imageTotal, itemImage, itemImageIndex) => (
+                                              collectionIndex === index && itemImageIndex === imageIndex
+                                                ? imageTotal
+                                                : imageTotal + getAdminImageSize(itemImage)
+                                            ), 0)
+                                          }, 0)
+                                          if (uploadedSize + file.size > MAX_ADMIN_BESPOKE_IMAGES_SIZE) {
+                                            throw new Error('Bespoke image uploads must total 4 MB or less')
+                                          }
+                                          const uploadedImage = await readAdminImage(file)
+                                          setLocalSettings(current => {
+                                            const nextCollections = Array.isArray(current[f.key]) ? [...current[f.key]] : []
+                                            if (!nextCollections[index]) return current
+                                            const currentCollection = nextCollections[index]
+                                            const images = Array.isArray(currentCollection.images) ? [...currentCollection.images] : []
+                                            images[imageIndex] = uploadedImage
+                                            nextCollections[index] = { ...currentCollection, images }
+                                            return { ...current, [f.key]: nextCollections }
+                                          })
+                                        } catch (error) {
+                                          toast.error(error.message)
+                                        } finally {
+                                          input.value = ''
+                                        }
+                                      }}
+                                    />
+                                    {image && <img src={image} alt={`${collection.name || `Collection ${index + 1}`} image ${imageIndex + 1} preview`} className="h-28 w-20 border border-border bg-muted object-contain" />}
+                                  </div>
+                                ))}
+                                <Button type="button" variant="outline" size="sm" className="w-full rounded-none text-xs" onClick={() => {
+                                  const nextCollections = [...localSettings[f.key]]
+                                  const images = Array.isArray(collection.images) ? [...collection.images] : []
+                                  images.push('')
+                                  nextCollections[index] = { ...collection, images }
+                                  setHomeField(f.key, nextCollections)
+                                }}>
+                                  <Plus className="mr-1.5 h-3.5 w-3.5" />Add Image
+                                </Button>
+                                <p className="text-[10px] leading-relaxed text-muted-foreground">Upload PNG, JPG, WEBP, or GIF files up to 2 MB each (4 MB total for Bespoke Collections), or paste image URLs. Images save with this collection’s description.</p>
+                              </div>
                             </div>
                           ))}
                           <Button type="button" variant="outline" className="w-full rounded-none text-xs" onClick={() => setHomeField(f.key, [...(Array.isArray(localSettings[f.key]) ? localSettings[f.key] : []), { name: '', description: '', images: [] }])}>
