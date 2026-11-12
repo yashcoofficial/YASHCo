@@ -59,6 +59,24 @@ function getAdminImageSize(value) {
   return base64 ? Math.floor(base64.length * 3 / 4) : 0
 }
 
+function getBespokeWorks(collection) {
+  if (Array.isArray(collection?.works)) {
+    return collection.works.map(work => typeof work === 'string'
+      ? { image: work, description: '' }
+      : { image: work?.image || '', description: work?.description || '' })
+  }
+
+  return (Array.isArray(collection?.images) ? collection.images : [])
+    .map(image => ({ image, description: '' }))
+}
+
+function hasBespokeContent(settings) {
+  return (Array.isArray(settings?.bespokeImages) && settings.bespokeImages.some(Boolean))
+    || (Array.isArray(settings?.bespokeCollections) && settings.bespokeCollections.some(collection => (
+      collection && (collection.name || collection.description || getBespokeWorks(collection).some(work => work.image || work.description))
+    )))
+}
+
 function getNavigationCategories(link, collections = []) {
   const pageKey = link?.pageKey || link?.page
   const collectionSlug = link?.collectionSlug ?? link?.collection ?? null
@@ -1076,7 +1094,7 @@ function HomeView() {
       case 'bespoke': {
         const bespokeImages = Array.isArray(settings.bespokeImages) ? settings.bespokeImages.filter(Boolean) : []
         const bespokeCollections = Array.isArray(settings.bespokeCollections)
-          ? settings.bespokeCollections.filter(collection => collection && (collection.name || collection.description || (Array.isArray(collection.images) && collection.images.some(Boolean))))
+          ? settings.bespokeCollections.filter(collection => collection && (collection.name || collection.description || getBespokeWorks(collection).some(work => work.image || work.description)))
           : []
         if (!bespokeImages.length && !bespokeCollections.length) return null
         return (
@@ -1090,19 +1108,24 @@ function HomeView() {
               {bespokeCollections.length ? (
                 <div className="mx-auto max-w-6xl space-y-14">
                   {bespokeCollections.map((collection, index) => {
-                    const images = Array.isArray(collection.images) ? collection.images.filter(Boolean) : []
+                    const works = getBespokeWorks(collection).filter(work => work.image || work.description)
                     return (
                       <article key={`${collection.name || 'bespoke'}-${index}`}>
                         <div className="mx-auto mb-6 max-w-2xl text-center">
                           {collection.name && <h3 className="font-serif text-2xl md:text-3xl">{collection.name}</h3>}
                           {collection.description && <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-muted-foreground">{collection.description}</p>}
                         </div>
-                        {images.length > 0 && (
-                          <div className={cx('mx-auto grid grid-cols-1 gap-4 sm:grid-cols-2 md:gap-6 lg:grid-cols-3', images.length === 1 && 'max-w-2xl')}>
-                            {images.map((image, imageIndex) => (
-                              <div key={`${image}-${imageIndex}`} className="img-zoom overflow-hidden bg-muted">
-                                <img src={image} alt={`${collection.name || 'Bespoke collection'} design ${imageIndex + 1}`} className="aspect-[4/5] w-full object-cover" loading="lazy" />
-                              </div>
+                        {works.length > 0 && (
+                          <div className={cx('mx-auto grid grid-cols-1 gap-6 sm:grid-cols-2 md:gap-8 lg:grid-cols-3', works.length === 1 && 'max-w-2xl')}>
+                            {works.map((work, workIndex) => (
+                              <figure key={`${work.image || 'bespoke-work'}-${workIndex}`} className="min-w-0">
+                                {work.image && (
+                                  <div className="img-zoom overflow-hidden bg-muted">
+                                    <img src={work.image} alt={`${collection.name || 'Bespoke collection'} design ${workIndex + 1}`} className="aspect-[4/5] w-full object-cover" loading="lazy" />
+                                  </div>
+                                )}
+                                {work.description && <figcaption className="mt-4 whitespace-pre-line text-sm leading-relaxed text-muted-foreground">{work.description}</figcaption>}
+                              </figure>
                             ))}
                           </div>
                         )}
@@ -1160,7 +1183,7 @@ function HomeView() {
 
   return (
     <div>
-      {sectionOrder.map(id => vis[id] === false ? null : renderSection(id))}
+      {sectionOrder.map(id => vis[id] === false && !(id === 'bespoke' && hasBespokeContent(settings)) ? null : renderSection(id))}
     </div>
   )
 }
@@ -3274,7 +3297,7 @@ const HOME_SECTION_DEFS = [
     preview: (s) => {
       const images = Array.isArray(s.bespokeImages) ? s.bespokeImages.filter(Boolean) : []
       const collections = Array.isArray(s.bespokeCollections)
-        ? s.bespokeCollections.filter(collection => collection && (collection.name || collection.description || (Array.isArray(collection.images) && collection.images.some(Boolean))))
+        ? s.bespokeCollections.filter(collection => collection && (collection.name || collection.description || getBespokeWorks(collection).some(work => work.image || work.description)))
         : []
       return (
         <div style={{ background: '#f5f2ed', padding: '20px 16px', textAlign: 'center' }}>
@@ -3286,8 +3309,13 @@ const HOME_SECTION_DEFS = [
               <div key={`${collection.name || 'bespoke'}-${index}`} style={{ marginTop: '12px' }}>
                 {collection.name && <div style={{ fontFamily: 'Georgia,serif', fontSize: '12px', marginBottom: '4px' }}>{collection.name}</div>}
                 {collection.description && <div style={{ color: '#6b7280', fontSize: '7px', lineHeight: 1.4, margin: '0 auto 6px', maxWidth: '260px' }}>{collection.description}</div>}
-                <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(Math.max((Array.isArray(collection.images) ? collection.images : []).filter(Boolean).length, 1), 3)}, 1fr)`, gap: '6px' }}>
-                  {(Array.isArray(collection.images) ? collection.images : []).filter(Boolean).slice(0, 3).map((image, imageIndex) => <img key={`${image}-${imageIndex}`} src={image} alt="" style={{ width: '100%', aspectRatio: '4/5', objectFit: 'cover', background: '#ddd' }} />)}
+                <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(Math.max(getBespokeWorks(collection).filter(work => work.image || work.description).length, 1), 3)}, 1fr)`, gap: '6px' }}>
+                  {getBespokeWorks(collection).filter(work => work.image || work.description).slice(0, 3).map((work, workIndex) => (
+                    <div key={`${work.image || 'work'}-${workIndex}`}>
+                      {work.image && <img src={work.image} alt="" style={{ width: '100%', aspectRatio: '4/5', objectFit: 'cover', background: '#ddd' }} />}
+                      {work.description && <div style={{ color: '#6b7280', fontSize: '7px', lineHeight: 1.4, marginTop: '4px' }}>{work.description}</div>}
+                    </div>
+                  ))}
                 </div>
               </div>
             ))
@@ -3562,7 +3590,8 @@ function AdminPageStudio() {
             {isHome ? (
               <div>
                 {allOrderedDefs.map((def, idx) => {
-                  const isHidden = homeSectionVisibility[def.id] === false
+                  const bespokeAlwaysVisible = def.id === 'bespoke' && hasBespokeContent(localSettings)
+                  const isHidden = homeSectionVisibility[def.id] === false && !bespokeAlwaysVisible
                   const isSelected = selectedSectionId === def.id
                   const isDragging = dragIdx === idx
                   const isDropTarget = dropIdx === idx
@@ -3601,9 +3630,10 @@ function AdminPageStudio() {
                         )}
                         {/* Visibility toggle */}
                         <button
+                          disabled={bespokeAlwaysVisible}
                           onClick={e => { e.stopPropagation(); toggleHomeVisibility(def.id) }}
                           className="absolute top-2 right-2 z-10 w-6 h-6 flex items-center justify-center rounded-sm hover:bg-black/10 transition-colors"
-                          title={isHidden ? 'Show section' : 'Hide section'}
+                          title={bespokeAlwaysVisible ? 'Visible on the home page while Bespoke Collection content exists' : isHidden ? 'Show section' : 'Hide section'}
                         >
                           {isHidden ? <EyeOff className="w-3.5 h-3.5 text-muted-foreground" /> : <Eye className="w-3.5 h-3.5 text-muted-foreground" />}
                         </button>
@@ -3762,23 +3792,23 @@ function AdminPageStudio() {
                                 const nextCollections = [...localSettings[f.key]]
                                 nextCollections[index] = { ...collection, description: event.target.value }
                                 setHomeField(f.key, nextCollections)
-                              }} placeholder="Optional collection description" aria-label={`Bespoke collection ${index + 1} description`} />
+                              }} placeholder="Optional introduction for this collection" aria-label={`Bespoke collection ${index + 1} introduction`} />
                               <div className="space-y-2">
-                                <span className="block text-[10px] tracking-editorial uppercase text-muted-foreground">Collection Images</span>
-                                {(Array.isArray(collection.images) ? collection.images : []).map((image, imageIndex) => (
-                                  <div key={imageIndex} className="border border-border p-2.5 space-y-2">
+                                <span className="block text-[10px] tracking-editorial uppercase text-muted-foreground">Bespoke pieces — each image has its own description</span>
+                                {getBespokeWorks(collection).map((work, workIndex) => (
+                                  <div key={workIndex} className="border border-border p-3 space-y-2">
                                     <div className="flex gap-2">
-                                      <Input className="rounded-none text-xs" value={image?.startsWith('data:') ? '' : image || ''} onChange={event => {
+                                      <Input className="rounded-none text-xs" value={work.image?.startsWith('data:') ? '' : work.image || ''} onChange={event => {
                                         const nextCollections = [...localSettings[f.key]]
-                                        const images = Array.isArray(collection.images) ? [...collection.images] : []
-                                        images[imageIndex] = event.target.value
-                                        nextCollections[index] = { ...collection, images }
+                                        const works = getBespokeWorks(collection)
+                                        works[workIndex] = { ...works[workIndex], image: event.target.value }
+                                        nextCollections[index] = { ...collection, works }
                                         setHomeField(f.key, nextCollections)
-                                      }} placeholder="Image URL (https://...)" aria-label={`Bespoke collection ${index + 1} image ${imageIndex + 1} URL`} />
-                                      <Button type="button" size="icon" variant="ghost" className="h-9 w-9 shrink-0 rounded-none text-destructive" aria-label={`Remove image ${imageIndex + 1} from bespoke collection ${index + 1}`} onClick={() => {
+                                      }} placeholder="Image URL (https://...)" aria-label={`Bespoke piece ${workIndex + 1} image URL`} />
+                                      <Button type="button" size="icon" variant="ghost" className="h-9 w-9 shrink-0 rounded-none text-destructive" aria-label={`Remove bespoke piece ${workIndex + 1} from collection ${index + 1}`} onClick={() => {
                                         const nextCollections = [...localSettings[f.key]]
-                                        const images = (Array.isArray(collection.images) ? collection.images : []).filter((_, itemIndex) => itemIndex !== imageIndex)
-                                        nextCollections[index] = { ...collection, images }
+                                        const works = getBespokeWorks(collection).filter((_, itemIndex) => itemIndex !== workIndex)
+                                        nextCollections[index] = { ...collection, works }
                                         setHomeField(f.key, nextCollections)
                                       }}>
                                         <X className="h-3.5 w-3.5" />
@@ -3788,7 +3818,7 @@ function AdminPageStudio() {
                                       type="file"
                                       accept="image/png,image/jpeg,image/webp,image/gif"
                                       className="rounded-none text-xs"
-                                      aria-label={`Upload image ${imageIndex + 1} for bespoke collection ${index + 1}`}
+                                      aria-label={`Upload image for bespoke piece ${workIndex + 1}`}
                                       onChange={async event => {
                                         const input = event.currentTarget
                                         const file = input.files?.[0]
@@ -3796,11 +3826,10 @@ function AdminPageStudio() {
                                         try {
                                           const collections = Array.isArray(localSettings[f.key]) ? localSettings[f.key] : []
                                           const uploadedSize = collections.reduce((total, item, collectionIndex) => {
-                                            const itemImages = Array.isArray(item.images) ? item.images : []
-                                            return total + itemImages.reduce((imageTotal, itemImage, itemImageIndex) => (
-                                              collectionIndex === index && itemImageIndex === imageIndex
+                                            return total + getBespokeWorks(item).reduce((imageTotal, itemWork, itemWorkIndex) => (
+                                              collectionIndex === index && itemWorkIndex === workIndex
                                                 ? imageTotal
-                                                : imageTotal + getAdminImageSize(itemImage)
+                                                : imageTotal + getAdminImageSize(itemWork.image)
                                             ), 0)
                                           }, 0)
                                           if (uploadedSize + file.size > MAX_ADMIN_BESPOKE_IMAGES_SIZE) {
@@ -3811,9 +3840,10 @@ function AdminPageStudio() {
                                             const nextCollections = Array.isArray(current[f.key]) ? [...current[f.key]] : []
                                             if (!nextCollections[index]) return current
                                             const currentCollection = nextCollections[index]
-                                            const images = Array.isArray(currentCollection.images) ? [...currentCollection.images] : []
-                                            images[imageIndex] = uploadedImage
-                                            nextCollections[index] = { ...currentCollection, images }
+                                            const works = getBespokeWorks(currentCollection)
+                                            if (!works[workIndex]) return current
+                                            works[workIndex] = { ...works[workIndex], image: uploadedImage }
+                                            nextCollections[index] = { ...currentCollection, works }
                                             return { ...current, [f.key]: nextCollections }
                                           })
                                         } catch (error) {
@@ -3823,23 +3853,30 @@ function AdminPageStudio() {
                                         }
                                       }}
                                     />
-                                    {image && <img src={image} alt={`${collection.name || `Collection ${index + 1}`} image ${imageIndex + 1} preview`} className="h-28 w-20 border border-border bg-muted object-contain" />}
+                                    {work.image && <img src={work.image} alt={`${collection.name || `Collection ${index + 1}`} piece ${workIndex + 1} preview`} className="h-28 w-20 border border-border bg-muted object-contain" />}
+                                    <Textarea rows={3} className="rounded-none text-sm" value={work.description || ''} onChange={event => {
+                                      const nextCollections = [...localSettings[f.key]]
+                                      const works = getBespokeWorks(collection)
+                                      works[workIndex] = { ...works[workIndex], description: event.target.value }
+                                      nextCollections[index] = { ...collection, works }
+                                      setHomeField(f.key, nextCollections)
+                                    }} placeholder={`Description for piece ${workIndex + 1}`} aria-label={`Bespoke piece ${workIndex + 1} description`} />
                                   </div>
                                 ))}
                                 <Button type="button" variant="outline" size="sm" className="w-full rounded-none text-xs" onClick={() => {
                                   const nextCollections = [...localSettings[f.key]]
-                                  const images = Array.isArray(collection.images) ? [...collection.images] : []
-                                  images.push('')
-                                  nextCollections[index] = { ...collection, images }
+                                  const works = getBespokeWorks(collection)
+                                  works.push({ image: '', description: '' })
+                                  nextCollections[index] = { ...collection, works }
                                   setHomeField(f.key, nextCollections)
                                 }}>
-                                  <Plus className="mr-1.5 h-3.5 w-3.5" />Add Image
+                                  <Plus className="mr-1.5 h-3.5 w-3.5" />Add Image & Description
                                 </Button>
-                                <p className="text-[10px] leading-relaxed text-muted-foreground">Upload PNG, JPG, WEBP, or GIF files up to 2 MB each (4 MB total for Bespoke Collections), or paste image URLs. Images save with this collection’s description.</p>
+                                <p className="text-[10px] leading-relaxed text-muted-foreground">Each piece displays with its own description. Upload PNG, JPG, WEBP, or GIF files up to 2 MB each (4 MB total), or paste an image URL.</p>
                               </div>
                             </div>
                           ))}
-                          <Button type="button" variant="outline" className="w-full rounded-none text-xs" onClick={() => setHomeField(f.key, [...(Array.isArray(localSettings[f.key]) ? localSettings[f.key] : []), { name: '', description: '', images: [] }])}>
+                          <Button type="button" variant="outline" className="w-full rounded-none text-xs" onClick={() => setHomeField(f.key, [...(Array.isArray(localSettings[f.key]) ? localSettings[f.key] : []), { name: '', description: '', works: [] }])}>
                             <Plus className="mr-1.5 h-3.5 w-3.5" />Add Bespoke Collection
                           </Button>
                         </div>
